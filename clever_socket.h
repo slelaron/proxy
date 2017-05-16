@@ -2,6 +2,7 @@
 
 #include "clever.h"
 #include <functional>
+#include <sys/types.h>
 
 struct clever_socket: clever
 {
@@ -10,11 +11,5 @@ struct clever_socket: clever
 	
 	clever_socket();
 
-	void set_on_read(std::function <int(clever&, clever&)> func);
-
-	protected:
-
-	std::function <int(clever&, clever&)> on_read;
-
-	virtual int read(epoll_event event);
+	void set_on_accept(const std::function <int(clever&, clever&)>& func);
 };

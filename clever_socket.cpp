@@ -20,28 +20,35 @@ clever_socket::clever_socket():
 	listen(fd, BACKLOGMAX);	
 }
 
-void clever_socket::set_on_read(std::function <int(clever&, clever&)> func)
+void clever_socket::set_on_accept(const std::function <int(clever&, clever&)>& func)
 {
-	on_read = func;
-}
+	on_read = [func, this](clever& object, epoll_event event)
+	{
+		log("Accepting " << event.data.fd);
+		sockaddr_in addr;
+		memset(&addr, 0, sizeof(addr));
+		socklen_t len = 0;
+		int result = accept(*object, (sockaddr*)&addr, &len);
+		if (result == -1)
+		{
+			log("Error occured " << *epoll_fd);
+			throw fd_exception(std::string("Error accepting file descriptor: ") + strerror(errno), *object);
+		}
+		else
+		{
+			log("No error " << result);
+		}
+		clever accepted = clever(result);
 
-int clever_socket::read(epoll_event event)
-{
-	log("Accepting " << event.data.fd);
-	sockaddr_in addr;
-	memset(&addr, 0, sizeof(addr));
-	socklen_t len = 0;
-	int result = accept(fd, (sockaddr*)&addr, &len);
-	if (result == -1)
-	{
-		log("Error occured " << epoll_fd.fd);
-		throw fd_exception(std::string("Error accepting file descriptor: ") + strerror(errno), fd);
-	}
-	else
-	{
-		log("No error " << result);
-	}
-	clever* accepted = new clever(result);
-	accepted->set_flags(accepted->get_flags() | clever::READABLE | clever::WRITABLE | clever::NON_BLOCK);
-	return on_read(*this, *accepted) | clever_action::STOP_WRITING;
+		//Error is here. Fucking sheet. I think, that correction these mistakes leads to create new class of static methods of the class.
+		//So it is very offensively. But for the future I know that creating classes in such way leads to many problems.
+		//Okay I think, that I'll make something very clever. There will be emplace method.
+		
+		accepted.set_flags(accepted.get_flags() | clever::READABLE | clever::WRITABLE | clever::NON_BLOCK);
+		//accepted.set_timeout(timer::TIME_TO_BREAK);
+		auto to_return = func(object, accepted) | clever_action::STOP_WRITING;
+		take_responsibility(std::move(accepted));
+		return to_return;
+	};
+	after_set_read_write();
 }

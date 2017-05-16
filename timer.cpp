@@ -1,5 +1,4 @@
 #include "timer.h"
-#include "clever.h"
 #include "log.h"
 #include "fd_exception.h"
 #include <set>
@@ -8,17 +7,17 @@
 timer::timer()
 {}
 
-void timer::add(clever fd, int time)
+void timer::add(simple_file_descriptor::pointer fd, int time)
 {
 	int current_time = time + clock();
-	if (descriptors.find(time) == descriptors.end())
+	if (descriptors.find(time) == descriptors.end() || (descriptors.find(time) != descriptors.end() && descriptors.at(time).size() == 0))
 	{
 		times.insert({current_time, time});
 	}
 	descriptors[time].insert({*fd, current_time});
 }
 
-void timer::erase(clever fd, int time)
+void timer::erase(simple_file_descriptor::pointer fd, int time)
 {
 	if (descriptors.find(time) != descriptors.end())
 	{
@@ -27,6 +26,7 @@ void timer::erase(clever fd, int time)
 		if (object->first == *fd)
 		{
 			container.erase(object);
+			times.erase(std::make_pair(object->second, time));
 		}
 		else
 		{
@@ -39,12 +39,12 @@ void timer::erase(clever fd, int time)
 	}
 }
 
-clever timer::timeout()
+simple_file_descriptor::pointer timer::timeout()
 {
 	int time = times.begin()->second;
 	times.erase(times.begin());
 	auto& to_update = descriptors[time];
-	clever to_return = clever(to_update.begin()->first, clever::NON_CLOSE);
+	simple_file_descriptor::pointer to_return = to_update.begin()->first;
 	to_update.erase(to_update.begin());
 	if (to_update.size() > 0)
 	{

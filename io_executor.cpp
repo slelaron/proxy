@@ -5,75 +5,89 @@
 
 io_executor::io_executor():
 	delivery(""),
-	start(0),
-	flags(0)
+	start(0)
 {}
 
 io_executor::io_executor(io_executor&& another)
 {
 	std::swap(another.delivery, delivery);
 	std::swap(another.start, start);
-	std::swap(another.flags, flags);
 }
 
-int io_executor::read(clever& socket)
+int io_executor::read(simple_file_descriptor::pointer fd)
 {
+	log("Read");
+	bool initial_emptiness = (delivery.size() == 0);
+	
 	char buffer[BUFFER_SIZE];
 	int cnt = 0;
 
 	if (delivery.size() >= 2 * BUFFER_SIZE)
 	{
-		log("Read overflow " << *socket);
-		return flags |= clever_action::STOP_READING;
+		log("Read overflow " << *fd);
+		return descriptor_action::STOP_READING;
 	}
 	
-	if ((cnt = ::read(*socket, buffer, BUFFER_SIZE)) > 0)
+	if ((cnt = ::read(*fd, buffer, BUFFER_SIZE)) > 0)
 	{
-		delivery += std::string(buffer, 0, cnt);
+		log("I have read " << cnt);
+		delivery += std::string(buffer, cnt);
 	}
+
+	log("Total delivery size " << delivery.size());
 
 	if (cnt < 0)
 	{
-		log("Occured error reading from " << *socket << ": " << strerror(errno));
-		return flags | clever_action::EXECUTION_ERROR;
+		log("Occured error reading from " << *fd << ": " << strerror(errno));
+		return descriptor_action::EXECUTION_ERROR;
 	}
 
 	if (cnt == 0)
 	{
-		return flags |= clever_action::CLOSING_SOCKET;
+		return descriptor_action::CLOSING_SOCKET;
 	}
 
-	flags &= ~clever_action::STOP_WRITING;
+	int flags = 0;
+
+	if (initial_emptiness)
+	{
+		flags |= descriptor_action::START_WRITING;
+	}
 
 	if (delivery.size() >= 2 * BUFFER_SIZE)
 	{
-		log("Read overflow " << *socket);
-		return flags |= clever_action::STOP_READING;
+		log("Read overflow " << *fd);
+		flags |= descriptor_action::STOP_READING;
 	}
 
 	return flags;
 }	
 
-int io_executor::write(clever& socket)
+int io_executor::write(simple_file_descriptor::pointer fd)
 {
+	log("Write");
+	bool initial_overflow = (delivery.size() >= 2 * BUFFER_SIZE);
 	if (delivery.size() == 0)
 	{
-		log("Nothing to write " << *socket);
-		return flags |= clever_action::STOP_WRITING;
+		log("Nothing to write " << *fd);
+		return descriptor_action::STOP_WRITING;
 	}
 	char buffer[BUFFER_SIZE];
 	int cnt = 0;
-	size_t deliver_size = std::min(sizeof buffer, delivery.size() - start);
+	size_t deliver_size = BUFFER_SIZE;
+	deliver_size = std::min(deliver_size, delivery.size() - start);
 	do
 	{
 		start += cnt;
 		if (start == delivery.size())
 			break;
-		deliver_size = std::min(sizeof buffer, delivery.size() - start);
+		deliver_size = BUFFER_SIZE;
+		deliver_size = std::min(deliver_size, delivery.size() - start);
 		log("Information " << deliver_size << ' ' << start << ' ' << delivery.size());
 		delivery.copy(buffer, deliver_size, start);
+		cnt = ::write(*fd, buffer, deliver_size);
 	}
-	while ((cnt = ::write(*socket, buffer, deliver_size)) == (ssize_t)deliver_size);
+	while (cnt == (ssize_t)deliver_size);
 
 	start += cnt;
 
@@ -85,13 +99,15 @@ int io_executor::write(clever& socket)
 
 	if (cnt < 0)
 	{
-		log("Occured error writing from " << *socket);
-		return flags | clever_action::EXECUTION_ERROR;
+		log("Occured error writing from " << *fd << ' ' << strerror(errno));
+		return descriptor_action::EXECUTION_ERROR;
 	}
 
-	if (delivery.size() < BUFFER_SIZE)
+	int flags = 0;
+
+	if (initial_overflow && delivery.size() < BUFFER_SIZE)
 	{
-		flags &= ~clever_action::STOP_READING;
+		flags |= descriptor_action::START_READING;
 	}
 
 	if (delivery.size() == 0)
@@ -100,4 +116,24 @@ int io_executor::write(clever& socket)
 	}
 
 	return flags;
+}
+
+std::string& io_executor::get_info()
+{
+	return delivery;
+}
+
+const std::string& io_executor::get_info() const
+{
+	return delivery;
+}
+
+void io_executor::put_info(std::string&& str)
+{
+	std::swap(delivery, str);
+}
+
+void io_executor::put_info(const std::string& str)
+{
+	delivery = str;
 }

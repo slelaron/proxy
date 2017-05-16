@@ -4,9 +4,12 @@
 #include <functional>
 #include <unordered_map>
 #include <map>
+#include <sys/types.h>
 #include <set>
 #include <memory>
+#include <list>
 #include "timer.h"
+#include <boost/optional.hpp>
 
 enum clever_action
 {
@@ -24,10 +27,13 @@ struct clever
 {
 	static const int NO_TIMER = -1;
 
-	explicit clever(int fd, int flags = 0, int time_to_die = NO_TIMER);
+	explicit clever(int fd, int flags = GENTELMAN_SET, int time_to_die = NO_TIMER);
 	clever(const clever& another) noexcept;
-	clever(clever&& another);
+	clever(clever&& another) noexcept;
 	~clever();
+
+	clever& operator=(clever&&);
+	clever& operator=(const clever&);
 
 	private:
 
@@ -35,19 +41,21 @@ struct clever
 
 	public:
 
-	int operator*();
+	int operator*() const;
 
 	void set_flags(int flags);
 	int get_flags();
 
 	void set_timeout(int millis);
-	void set_on_read(std::function <int(clever&)> func);
-	void set_on_write(std::function <int(clever&)> func);
+	void set_on_read(const std::function <int(clever&)>& func);
+	void set_on_write(const std::function <int(clever&)>& func);
+
+	void take_responsibility(clever&& irresponsible);
 
 	protected:
-	
-	static inline epoll_event change_status_of_reading_writing(clever_action action, int flag, epoll_event event, int result, int fd);
 
+	static inline void erase_file_descriptor(int descriptor);
+	static inline epoll_event change_status_of_reading_writing(clever_action action, int flag, epoll_event event, int result, int fd);
 	static inline void after_action(int result, epoll_event current, int fd);
 
 	public:
@@ -64,10 +72,13 @@ struct clever
 	
 	protected:
 
+	epoll_event set_epoll_flags(int flags);
+	void after_set_read_write();
+
 	static const int MAX_EVENTS = 2048;
 
-	virtual int read(epoll_event event);
-	virtual int write(epoll_event event);
+	int read(epoll_event event);
+	int write(epoll_event event);
 
 	void delete_all_objects(int fd, int flags);
 
@@ -76,10 +87,12 @@ struct clever
 	int fd;
 	int flags;
 	int time_to_die;
-	//std::list <clever> responsible;
+	std::list <clever> responsible;
 	static const clever epoll_fd;
 	static timer clever_time;
-	static std::map <int, std::unique_ptr <clever>> ref_descriptors;
-	std::function <int(clever&)> on_read;
-	std::function <int(clever&)> on_write;
+	static std::map <int, clever> ref_descriptors;
+	std::function <int(clever&, epoll_event)> on_read;
+	std::function <int(clever&, epoll_event)> on_write;
+	boost::optional <std::pair <std::list <clever>&, std::list <clever>::iterator> > parent;
+	boost::optional <std::list <clever>::iterator> in_timer;
 };

@@ -1,0 +1,13 @@
+#pragma once
+
+enum descriptor_action
+{
+	STOP_WRITING = 1,
+	STOP_READING = 2,
+	CLOSING_SOCKET = 4,
+	EXECUTION_ERROR = 8,
+	WITHOUT_ACCIDENTS = 0,
+	STOP_WAITING = 16,
+	START_WRITING = 32,
+	START_READING = 64
+};

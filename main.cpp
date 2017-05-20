@@ -20,6 +20,7 @@ int main()
 	//freopen("output", "w", stdout);
 	socket_descriptor <non_blocking, acceptable </*time_dependent_compile <10000>,*/ non_blocking, writable, acceptable <non_blocking, auto_closable, acceptable </*time_dependent_compile <15000>,*/ non_blocking, readable, writable>>>> needed_fd;
 	everything_executor executor;
+\
 
 	typedef std::list <std::pair <simple_file_descriptor::pointer, int>> special_type;
 
@@ -43,16 +44,20 @@ int main()
 			int res = in->read(fd);
 			special_type to_return;
 
-			if (res & (STOP_READING | START_READING))
+			if (res & (STOP_READING | START_READING | CLOSING_SOCKET))
 			{
-				to_return.push_back({fd, res & (STOP_READING | START_READING)});
+				//int now_result = res & (STOP_READING | START_READING | CLOSING_SOCKET);
+				//log(*fd << " to " << ((now_result & STOP_WRITING) ? "STOP_WRITING " : "") << ((now_result & START_WRITING) ? "START_WRITING " : "") << ((now_result & STOP_READING) ? "STOP_READING " : "") << ((now_result & START_READING) ? "START_READING " : "") << ((now_result & CLOSING_SOCKET) ? "CLOSE " : ""));
+				to_return.push_back({fd, res & (STOP_READING | START_READING | CLOSING_SOCKET)});
 			}
 			
 			if (*other_side)
 			{
-				if (res & (STOP_WRITING | START_WRITING))
+				if (res & (STOP_WRITING | START_WRITING | CLOSING_SOCKET))
 				{
-					to_return.push_back({other_side->get(), res & (STOP_WRITING | START_WRITING)});
+					//int now_result = res & (STOP_WRITING | START_WRITING | CLOSING_SOCKET);
+					//log(*(other_side->get()) << " to " << ((now_result & STOP_WRITING) ? "STOP_WRITING " : "") << ((now_result & START_WRITING) ? "START_WRITING " : "") << ((now_result & STOP_READING) ? "STOP_READING " : "") << ((now_result & START_READING) ? "START_READING " : "") << ((now_result & CLOSING_SOCKET) ? "CLOSE " : ""));
+					to_return.push_back({other_side->get(), res & (STOP_WRITING | START_WRITING | CLOSING_SOCKET)});
 				}
 			}
 			else if (http_parser::is_full(in->get_info()))
@@ -79,7 +84,7 @@ int main()
 
 						auto func_to_apply = resolver->get_resolved(fd1);
 
-						log("My host name was resolved! I am so happy!");
+						//log("My host name was resolved! I am so happy!");
 
 						if (func_to_apply)
 						{
@@ -93,18 +98,18 @@ int main()
 								{
 									int result = out->read(fd1);
 
-									log("Now flags " << ((result & STOP_WRITING) ? "STOP_WRITING " : "") << ((result & START_WRITING) ? "START_WRITING " : "") << ((result & STOP_READING) ? "STOP_READING " : "") << ((result & START_READING) ? "START_READING " : ""));
-
 									special_type to_return;
-									if (result & (STOP_WRITING | START_WRITING))
+									if (result & (STOP_WRITING | START_WRITING | CLOSING_SOCKET))
 									{
-										log("Now flags for " << *another << ' ' << ((result_flags & STOP_WRITING) ? "STOP_WRITING " : "") << ((result_flags & START_WRITING) ? "START_WRITING " : "") << ((result_flags & STOP_READING) ? "STOP_READING " : "") << ((result_flags & START_READING) ? "START_READING " : ""));
-										to_return.push_back({another, result & (STOP_WRITING | START_WRITING)});
+										//int now_result = result & (STOP_WRITING | START_WRITING | CLOSING_SOCKET);
+										//log(*another << " to " << ((now_result & STOP_WRITING) ? "STOP_WRITING " : "") << ((now_result & START_WRITING) ? "START_WRITING " : "") << ((now_result & STOP_READING) ? "STOP_READING " : "") << ((now_result & START_READING) ? "START_READING " : "") << ((now_result & CLOSING_SOCKET) ? "CLOSE " : ""));
+										to_return.push_back({another, result & (STOP_WRITING | START_WRITING | CLOSING_SOCKET)});
 									}
-									if (result & (STOP_READING | START_READING))
+									if (result & (STOP_READING | START_READING | CLOSING_SOCKET))
 									{
-										log("Now flags for " << *another << ' ' << ((result & STOP_WRITING) ? "STOP_WRITING " : "") << ((result & START_WRITING) ? "START_WRITING " : "") << ((result & STOP_READING) ? "STOP_READING " : "") << ((result & START_READING) ? "START_READING " : ""));
-										to_return.push_back({fd1, result & (STOP_READING | START_READING)});
+										//int now_result = result & (STOP_READING | START_READING | CLOSING_SOCKET);
+										//log(*fd1 << " to " << ((now_result & STOP_WRITING) ? "STOP_WRITING " : "") << ((now_result & START_WRITING) ? "START_WRITING " : "") << ((now_result & STOP_READING) ? "STOP_READING " : "") << ((now_result & START_READING) ? "START_READING " : "") << ((now_result & CLOSING_SOCKET) ? "CLOSE " : ""));
+										to_return.push_back({fd1, result & (STOP_READING | START_READING | CLOSING_SOCKET)});
 									}
 									return to_return;
 								};
@@ -113,16 +118,18 @@ int main()
 								{
 									int result = in->write(fd1);
 
-									log("Now flags " << ((result & STOP_WRITING) ? "STOP_WRITING " : "") << ((result & START_WRITING) ? "START_WRITING " : "") << ((result & STOP_READING) ? "STOP_READING " : "") << ((result & START_READING) ? "START_READING " : ""));
-									
 									special_type to_return;
 									if (result & (STOP_READING | START_READING))
 									{
-										to_return.push_back({another, result & (STOP_READING | START_READING)});
+										//int now_result = result & (STOP_READING | START_READING | CLOSING_SOCKET);
+										//log(*another << " to " << ((now_result & STOP_WRITING) ? "STOP_WRITING " : "") << ((now_result & START_WRITING) ? "START_WRITING " : "") << ((now_result & STOP_READING) ? "STOP_READING " : "") << ((now_result & START_READING) ? "START_READING " : "") << ((now_result & CLOSING_SOCKET) ? "CLOSE " : ""));
+										to_return.push_back({another, result & (STOP_READING | START_READING | CLOSING_SOCKET)});
 									}
 									if (result & (STOP_WRITING | START_WRITING))
 									{
-										to_return.push_back({fd1, result & (STOP_WRITING | START_WRITING)});
+										//int now_result = result & (STOP_WRITING | START_WRITING | CLOSING_SOCKET);
+										//log(*fd1 << " to " << ((now_result & STOP_WRITING) ? "STOP_WRITING " : "") << ((now_result & START_WRITING) ? "START_WRITING " : "") << ((now_result & STOP_READING) ? "STOP_READING " : "") << ((now_result & START_READING) ? "START_READING " : "") << ((now_result & CLOSING_SOCKET) ? "CLOSE " : ""));
+										to_return.push_back({fd1, result & (STOP_WRITING | START_WRITING | CLOSING_SOCKET)});
 									}
 									return to_return;
 								};
@@ -131,21 +138,21 @@ int main()
 
 								if (next)
 								{
-									log("Accepting proxy-server file descriptors");
+									//log("Accepting proxy-server file descriptors");
 									*other_side = boost::make_optional <simple_file_descriptor::pointer> (**next);
-									to_return.push_back(file_descriptor <time_dependent_compile <15000>, non_blocking, readable, writable>(**next));
+									to_return.push_back(file_descriptor </*time_dependent_compile <15000>,*/ non_blocking, readable, writable>(**next));
 									(to_return.end() - 1)->set_read(last_for_read);
 									(to_return.end() - 1)->set_write(last_for_write);
 								}
 								else
 								{
-									log("Bad function");
+									//log("Bad function");
 								}
 							}
 						}
 						else
 						{
-							log("Bad func_to_apply");
+							//log("Bad func_to_apply");
 						}
 						return std::make_pair(special_type(), std::move(to_return));
 					};

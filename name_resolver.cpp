@@ -28,7 +28,6 @@ boost::optional <std::function <boost::optional <simple_file_descriptor::pointer
 	names.erase(consumers.at(fd).first);
 	if (consumers.at(fd).second.get() == NULL)
 	{
-		log("Xyevoye mesto");
 		return boost::none;
 	}
 	auto result = get_result(consumers.at(fd).second.get());
@@ -66,7 +65,7 @@ std::function <boost::optional <simple_file_descriptor::pointer>()> name_resolve
 
 std::function <addrinfo*()> name_resolver::get_task(std::string host)
 {
-	log("Here host " << host);
+	//log("Here host " << host);
 	return [host]() -> addrinfo*
 	{
 		addrinfo hints;
@@ -78,14 +77,11 @@ std::function <addrinfo*()> name_resolver::get_task(std::string host)
 		hints.ai_flags = 0;
 		hints.ai_protocol = 0;
 
-		error = getaddrinfo(host.c_str(), "80", &hints, &result);
+		error = getaddrinfo(host.c_str(), "http", &hints, &result);
 		if (error != 0)
 		{
-			log("I am here! " << host.c_str() << ' ' << gai_strerror(error));
 			return NULL;
 		}
-
-		log("Result " << result);
 
 		return result;
 	};

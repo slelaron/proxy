@@ -1,3 +1,5 @@
+//DEPRECATED
+
 #include "clever_socket.h"
 #include "log.h"
 #include "fd_exception.h"

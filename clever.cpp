@@ -1,3 +1,5 @@
+//DEPRECATED
+
 #include "clever.h"
 #include <sys/epoll.h>
 #include <unistd.h>

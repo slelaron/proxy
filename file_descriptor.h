@@ -90,6 +90,7 @@ struct socket_descriptor: virtual simple_file_descriptor,
 			{
 				throw fd_exception(std::string("Error accepting file descriptor: ") + strerror(errno), event.data.fd);
 			}
+			log("Accepting new socket " << result);
 			std::vector <first_accessable> vt;
 			//first_accessable accepted = result;
 			vt.emplace_back(result);
@@ -342,8 +343,12 @@ struct everything_executor
 	inline void after_action(acceptable_type& result)
 	{
 		for (auto iter: result)
-		{
+		{	
 			auto fd = iter.first;
+
+			if (init_flags.find(*fd) == init_flags.end())
+				continue;
+			
 			int init = init_flags.at(*fd);
 			int& fl = flags.at(*fd);
 			epoll_event event = change_status_of_reading_writing(fd, init, fl, iter.second);
@@ -406,6 +411,7 @@ struct everything_executor
 				}
 				if (init_flags.find(current.data.fd) != init_flags.end() && (init_flags.at(current.data.fd) & auto_closable_flag))
 				{
+					log("Auto-close " << current.data.fd);
 					total_erasing(current.data.fd);
 				}
 			}

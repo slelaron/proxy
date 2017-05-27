@@ -5,7 +5,7 @@
 #include <cstdio>
 
 #include "log.h"
-#include "io_executor.h"
+#include "http_executor.h"
 #include "file_descriptor.h"
 #include "wrappers.h"
 #include "signal_exception.h"
@@ -18,15 +18,14 @@
 int main()
 {
 	//freopen("output", "w", stdout);
-	socket_descriptor <non_blocking, acceptable </*time_dependent_compile <10000>,*/ non_blocking, writable, acceptable <non_blocking, auto_closable, acceptable </*time_dependent_compile <15000>,*/ non_blocking, readable, writable>>>> needed_fd;
+	socket_descriptor <non_blocking, acceptable <time_dependent_compile <10000>, non_blocking, writable, acceptable <non_blocking, auto_closable, acceptable <time_dependent_compile <15000>, non_blocking, readable, writable>>>> needed_fd;
 	everything_executor executor;
-\
 
 	typedef std::list <std::pair <simple_file_descriptor::pointer, int>> special_type;
 
 	std::shared_ptr <name_resolver> resolver = std::make_shared <name_resolver>();
 
-	typedef std::list <std::tuple <simple_file_descriptor::pointer, std::shared_ptr <io_executor>, std::shared_ptr <io_executor>, std::shared_ptr <boost::optional <simple_file_descriptor::pointer>>>> type_in_mp;
+	typedef std::list <std::tuple <simple_file_descriptor::pointer, std::shared_ptr <http_executor>, std::shared_ptr <io_executor>, std::shared_ptr <boost::optional <simple_file_descriptor::pointer>>>> type_in_mp;
 
 	typedef std::map <simple_file_descriptor::pointer, type_in_mp> mp_type; 
 	
@@ -34,20 +33,152 @@ int main()
 	
 	auto result = [resolver, mp]()
 	{
-		std::shared_ptr <io_executor> in = std::make_shared <io_executor>();
+		std::shared_ptr <http_executor> in = std::make_shared <http_executor>();
 		std::shared_ptr <io_executor> out = std::make_shared <io_executor>();
 		std::shared_ptr <boost::optional <simple_file_descriptor::pointer>> other_side = std::make_shared <boost::optional <simple_file_descriptor::pointer>>();
-		auto for_accept = [resolver, in, out, other_side, mp](simple_file_descriptor::pointer fd, epoll_event)
+		std::shared_ptr <boost::optional <std::string>> previous_host = std::make_shared <boost::optional <std::string>>();
+		std::shared_ptr <bool> change_host = std::make_shared <bool>(true);
+		
+		auto for_accept = [resolver, in, out, other_side, mp, change_host, previous_host](simple_file_descriptor::pointer fd, epoll_event)
 		{
-			typedef file_descriptor <non_blocking, auto_closable, acceptable </*time_dependent_compile <15000>,*/ non_blocking, readable, writable>> now_type;
+			typedef file_descriptor <non_blocking, auto_closable, acceptable <time_dependent_compile <15000>, non_blocking, readable, writable>> now_type;
+			
+			if (in->status())
+			{
+				in->reset();
+				*change_host = true;
+			}
 			
 			int res = in->read(fd);
 			special_type to_return;
 
+			
+			if (*change_host && in->is_header_full())
+			{
+				std::cout << in->get_header() << std::endl;
+				std::string host = *in->get_host();
+				boost::optional <int> port = in->get_port();
+				if (*previous_host && host == **previous_host)
+				{
+					*change_host = false;
+				}
+				else
+				{
+					*previous_host = boost::optional <std::string>(host);
+					log("Host " << host);
+					if (port)
+					{
+						log("Port " << *port);
+					}
+					auto res = resolver->resolve(host);
+					log("Resolving host " << host << ". Information: " << ((res.first == name_resolver::action::NEW) ? "New" : "Already exist"));
+					
+					if (res.first == name_resolver::action::NEW)
+					{
+						mp->insert({res.second, type_in_mp()});
+					}
+					
+					auto& storage = mp->operator[](res.second);
+					storage.push_back(make_tuple(fd, in, out, other_side));
+					
+					if (res.first == name_resolver::action::NEW)
+					{					
+						auto for_accept = [mp, resolver, port](simple_file_descriptor::pointer fd1, epoll_event)
+						{
+							auto list = mp->operator[](fd1);
+							mp->erase(mp->find(fd1));
+							std::vector <file_descriptor <time_dependent_compile <15000>, non_blocking, readable, writable>> to_return;
+
+							auto func_to_apply = resolver->get_resolved(fd1, port);
+
+							//log("My host name was resolved! I am so happy!");
+
+							if (func_to_apply)
+							{
+								for (auto iter: list)
+								{
+									auto another = std::get<0>(iter);
+									auto in = std::get<1>(iter);
+									auto out = std::get<2>(iter);
+									auto other_side = std::get<3>(iter);
+									
+									auto last_for_read = [another, out](simple_file_descriptor::pointer fd1, epoll_event)
+									{
+										int result = out->read(fd1);
+
+										special_type to_return;
+										if (result & (STOP_WRITING | START_WRITING))
+										{
+											int now_result = result & (STOP_WRITING | START_WRITING | CLOSING_SOCKET);
+											log(*another << " to " << ((now_result & STOP_WRITING) ? "STOP_WRITING " : "") << ((now_result & START_WRITING) ? "START_WRITING " : "") << ((now_result & STOP_READING) ? "STOP_READING " : "") << ((now_result & START_READING) ? "START_READING " : "") << ((now_result & CLOSING_SOCKET) ? "CLOSE " : ""));
+											to_return.push_back({another, result & (STOP_WRITING | START_WRITING | CLOSING_SOCKET)});
+										}
+										if (result & (STOP_READING | START_READING | CLOSING_SOCKET))
+										{
+											int now_result = result & (STOP_READING | START_READING | CLOSING_SOCKET);
+											log(*fd1 << " to " << ((now_result & STOP_WRITING) ? "STOP_WRITING " : "") << ((now_result & START_WRITING) ? "START_WRITING " : "") << ((now_result & STOP_READING) ? "STOP_READING " : "") << ((now_result & START_READING) ? "START_READING " : "") << ((now_result & CLOSING_SOCKET) ? "CLOSE " : ""));
+											to_return.push_back({fd1, result & (STOP_READING | START_READING | CLOSING_SOCKET)});
+										}
+										return to_return;
+									};
+
+									auto last_for_write = [another, in](simple_file_descriptor::pointer fd1, epoll_event)
+									{
+										int result = in->write(fd1);
+
+										special_type to_return;
+										if (result & (STOP_READING | START_READING))
+										{
+											int now_result = result & (STOP_READING | START_READING | CLOSING_SOCKET);
+											log(*another << " to " << ((now_result & STOP_WRITING) ? "STOP_WRITING " : "") << ((now_result & START_WRITING) ? "START_WRITING " : "") << ((now_result & STOP_READING) ? "STOP_READING " : "") << ((now_result & START_READING) ? "START_READING " : "") << ((now_result & CLOSING_SOCKET) ? "CLOSE " : ""));
+											to_return.push_back({another, result & (STOP_READING | START_READING | CLOSING_SOCKET)});
+										}
+										if (result & (STOP_WRITING | START_WRITING))
+										{
+											int now_result = result & (STOP_WRITING | START_WRITING | CLOSING_SOCKET);
+											log(*fd1 << " to " << ((now_result & STOP_WRITING) ? "STOP_WRITING " : "") << ((now_result & START_WRITING) ? "START_WRITING " : "") << ((now_result & STOP_READING) ? "STOP_READING " : "") << ((now_result & START_READING) ? "START_READING " : "") << ((now_result & CLOSING_SOCKET) ? "CLOSE " : ""));
+											to_return.push_back({fd1, result & (STOP_WRITING | START_WRITING | CLOSING_SOCKET)});
+										}
+										return to_return;
+									};
+
+									auto next = func_to_apply->operator()();
+
+									if (next)
+									{
+										log("Accepting proxy-server file descriptors");
+										*other_side = boost::make_optional <simple_file_descriptor::pointer> (**next);
+										to_return.push_back(file_descriptor <time_dependent_compile <15000>, non_blocking, readable, writable>(**next));
+										(to_return.end() - 1)->set_read(last_for_read);
+										(to_return.end() - 1)->set_write(last_for_write);
+									}
+									else
+									{
+										log("Bad function");
+									}
+								}
+							}
+							else
+							{
+								log("Bad func_to_apply");
+							}
+							return std::make_pair(special_type(), std::move(to_return));
+						};
+
+						now_type fd(*res.second);
+						fd.set_accept(for_accept);
+						std::vector <now_type> vt;
+						vt.push_back(std::move(fd));
+						return std::make_pair(special_type(), std::move(vt));
+					}
+					return std::make_pair(special_type(), std::vector <now_type>());
+				}
+			}
+
 			if (res & (STOP_READING | START_READING | CLOSING_SOCKET))
 			{
-				//int now_result = res & (STOP_READING | START_READING | CLOSING_SOCKET);
-				//log(*fd << " to " << ((now_result & STOP_WRITING) ? "STOP_WRITING " : "") << ((now_result & START_WRITING) ? "START_WRITING " : "") << ((now_result & STOP_READING) ? "STOP_READING " : "") << ((now_result & START_READING) ? "START_READING " : "") << ((now_result & CLOSING_SOCKET) ? "CLOSE " : ""));
+				int now_result = res & (STOP_READING | START_READING | CLOSING_SOCKET);
+				log(*fd << " to " << ((now_result & STOP_WRITING) ? "STOP_WRITING " : "") << ((now_result & START_WRITING) ? "START_WRITING " : "") << ((now_result & STOP_READING) ? "STOP_READING " : "") << ((now_result & START_READING) ? "START_READING " : "") << ((now_result & CLOSING_SOCKET) ? "CLOSE " : ""));
 				to_return.push_back({fd, res & (STOP_READING | START_READING | CLOSING_SOCKET)});
 			}
 			
@@ -55,117 +186,12 @@ int main()
 			{
 				if (res & (STOP_WRITING | START_WRITING | CLOSING_SOCKET))
 				{
-					//int now_result = res & (STOP_WRITING | START_WRITING | CLOSING_SOCKET);
-					//log(*(other_side->get()) << " to " << ((now_result & STOP_WRITING) ? "STOP_WRITING " : "") << ((now_result & START_WRITING) ? "START_WRITING " : "") << ((now_result & STOP_READING) ? "STOP_READING " : "") << ((now_result & START_READING) ? "START_READING " : "") << ((now_result & CLOSING_SOCKET) ? "CLOSE " : ""));
+					int now_result = res & (STOP_WRITING | START_WRITING | CLOSING_SOCKET);
+					log(*(other_side->get()) << " to " << ((now_result & STOP_WRITING) ? "STOP_WRITING " : "") << ((now_result & START_WRITING) ? "START_WRITING " : "") << ((now_result & STOP_READING) ? "STOP_READING " : "") << ((now_result & START_READING) ? "START_READING " : "") << ((now_result & CLOSING_SOCKET) ? "CLOSE " : ""));
 					to_return.push_back({other_side->get(), res & (STOP_WRITING | START_WRITING | CLOSING_SOCKET)});
 				}
 			}
-			else if (http_parser::is_full(in->get_info()))
-			{
-				std::string host = http_parser::get_host(in->get_info());
-				log("Host " << host);
-				auto res = resolver->resolve(host);
-				
-				if (res.first == name_resolver::action::NEW)
-				{
-					mp->insert({res.second, type_in_mp()});
-				}
-				
-				auto& storage = mp->operator[](res.second);
-				storage.push_back(make_tuple(fd, in, out, other_side));
-				
-				if (res.first == name_resolver::action::NEW)
-				{					
-					auto for_accept = [mp, resolver](simple_file_descriptor::pointer fd1, epoll_event)
-					{
-						auto list = mp->operator[](fd1);
-						mp->erase(mp->find(fd1));
-						std::vector <file_descriptor </*time_dependent_compile <15000>,*/ non_blocking, readable, writable>> to_return;
-
-						auto func_to_apply = resolver->get_resolved(fd1);
-
-						//log("My host name was resolved! I am so happy!");
-
-						if (func_to_apply)
-						{
-							for (auto iter: list)
-							{
-								auto another = std::get<0>(iter);
-								auto in = std::get<1>(iter);
-								auto out = std::get<2>(iter);
-								auto other_side = std::get<3>(iter);
-								auto last_for_read = [another, out](simple_file_descriptor::pointer fd1, epoll_event)
-								{
-									int result = out->read(fd1);
-
-									special_type to_return;
-									if (result & (STOP_WRITING | START_WRITING | CLOSING_SOCKET))
-									{
-										//int now_result = result & (STOP_WRITING | START_WRITING | CLOSING_SOCKET);
-										//log(*another << " to " << ((now_result & STOP_WRITING) ? "STOP_WRITING " : "") << ((now_result & START_WRITING) ? "START_WRITING " : "") << ((now_result & STOP_READING) ? "STOP_READING " : "") << ((now_result & START_READING) ? "START_READING " : "") << ((now_result & CLOSING_SOCKET) ? "CLOSE " : ""));
-										to_return.push_back({another, result & (STOP_WRITING | START_WRITING | CLOSING_SOCKET)});
-									}
-									if (result & (STOP_READING | START_READING | CLOSING_SOCKET))
-									{
-										//int now_result = result & (STOP_READING | START_READING | CLOSING_SOCKET);
-										//log(*fd1 << " to " << ((now_result & STOP_WRITING) ? "STOP_WRITING " : "") << ((now_result & START_WRITING) ? "START_WRITING " : "") << ((now_result & STOP_READING) ? "STOP_READING " : "") << ((now_result & START_READING) ? "START_READING " : "") << ((now_result & CLOSING_SOCKET) ? "CLOSE " : ""));
-										to_return.push_back({fd1, result & (STOP_READING | START_READING | CLOSING_SOCKET)});
-									}
-									return to_return;
-								};
-
-								auto last_for_write = [another, in](simple_file_descriptor::pointer fd1, epoll_event)
-								{
-									int result = in->write(fd1);
-
-									special_type to_return;
-									if (result & (STOP_READING | START_READING))
-									{
-										//int now_result = result & (STOP_READING | START_READING | CLOSING_SOCKET);
-										//log(*another << " to " << ((now_result & STOP_WRITING) ? "STOP_WRITING " : "") << ((now_result & START_WRITING) ? "START_WRITING " : "") << ((now_result & STOP_READING) ? "STOP_READING " : "") << ((now_result & START_READING) ? "START_READING " : "") << ((now_result & CLOSING_SOCKET) ? "CLOSE " : ""));
-										to_return.push_back({another, result & (STOP_READING | START_READING | CLOSING_SOCKET)});
-									}
-									if (result & (STOP_WRITING | START_WRITING))
-									{
-										//int now_result = result & (STOP_WRITING | START_WRITING | CLOSING_SOCKET);
-										//log(*fd1 << " to " << ((now_result & STOP_WRITING) ? "STOP_WRITING " : "") << ((now_result & START_WRITING) ? "START_WRITING " : "") << ((now_result & STOP_READING) ? "STOP_READING " : "") << ((now_result & START_READING) ? "START_READING " : "") << ((now_result & CLOSING_SOCKET) ? "CLOSE " : ""));
-										to_return.push_back({fd1, result & (STOP_WRITING | START_WRITING | CLOSING_SOCKET)});
-									}
-									return to_return;
-								};
-
-								auto next = func_to_apply->operator()();
-
-								if (next)
-								{
-									//log("Accepting proxy-server file descriptors");
-									*other_side = boost::make_optional <simple_file_descriptor::pointer> (**next);
-									to_return.push_back(file_descriptor </*time_dependent_compile <15000>,*/ non_blocking, readable, writable>(**next));
-									(to_return.end() - 1)->set_read(last_for_read);
-									(to_return.end() - 1)->set_write(last_for_write);
-								}
-								else
-								{
-									//log("Bad function");
-								}
-							}
-						}
-						else
-						{
-							//log("Bad func_to_apply");
-						}
-						return std::make_pair(special_type(), std::move(to_return));
-					};
-
-					now_type fd(*res.second);
-					fd.set_accept(for_accept);
-					std::vector <now_type> vt;
-					vt.push_back(std::move(fd));
-					return std::make_pair(special_type(), std::move(vt));
-				}
-
-				return std::make_pair(special_type(), std::vector <now_type>());
-			}
+			
 			return std::make_pair(std::move(to_return), std::vector <now_type>());
 		};
 

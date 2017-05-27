@@ -26,7 +26,7 @@ struct name_resolver
 	
 	std::pair <name_resolver::action, simple_file_descriptor::pointer> resolve(std::string);
 
-	boost::optional <std::function <boost::optional <simple_file_descriptor::pointer>()>> get_resolved(simple_file_descriptor::pointer);
+	boost::optional <std::function <boost::optional <simple_file_descriptor::pointer>()>> get_resolved(simple_file_descriptor::pointer, boost::optional <int>);
 
 	private:
 
@@ -42,7 +42,7 @@ struct name_resolver
 
 	private:
 
-	std::function <boost::optional <simple_file_descriptor::pointer>()> get_result(addrinfo* result);
+	std::function <boost::optional <simple_file_descriptor::pointer>()> get_result(addrinfo* result, boost::optional <int>);
 	
 	std::map <std::string, simple_file_descriptor::pointer> names;
 	std::map <simple_file_descriptor::pointer, std::pair <std::string, promise_to_task <addrinfo*>>> consumers;

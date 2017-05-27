@@ -1,3 +1,5 @@
+//Not used
+
 #pragma once
 
 #include <map>
@@ -24,7 +26,7 @@ struct http_parser
 				return true;
 			}
 		}
-		log("Wrong host name!\n" << need);
+		log("Wrong host name! " << need);
 		return false;
 	}
 

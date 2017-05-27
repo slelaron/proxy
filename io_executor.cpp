@@ -46,6 +46,7 @@ int io_executor::read(simple_file_descriptor::pointer fd)
 
 	if (cnt == 0)
 	{
+		log("I want to close file descriptors!");
 		return descriptor_action::CLOSING_SOCKET;
 	}
 
@@ -68,7 +69,7 @@ int io_executor::read(simple_file_descriptor::pointer fd)
 int io_executor::write(simple_file_descriptor::pointer fd)
 {
 	//log("Write " << delivery.size() << ' ' << start);
-	bool initial_overflow = (delivery.size() - start >= BUFFER_SIZE);
+	//bool initial_overflow = (delivery.size() - start >= BUFFER_SIZE);
 	if (delivery.size() == 0)
 	{
 		//log("Nothing to write " << *fd);
@@ -108,7 +109,7 @@ int io_executor::write(simple_file_descriptor::pointer fd)
 
 	int flags = 0;
 
-	if (initial_overflow && delivery.size() - start < BUFFER_SIZE)
+	if (delivery.size() - start < BUFFER_SIZE)
 	{
 		flags |= descriptor_action::START_READING;
 	}

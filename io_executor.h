@@ -20,7 +20,7 @@ struct io_executor
 	int read(simple_file_descriptor::pointer);
 	int write(simple_file_descriptor::pointer);
 
-	private:
+	protected:
 
 	std::string delivery;
 	size_t start;

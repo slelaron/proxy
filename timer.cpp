@@ -30,7 +30,7 @@ void timer::erase(simple_file_descriptor::pointer fd, int time)
 		}
 		else
 		{
-			throw fd_exception("May be it is bug. You try delete element, that doesn't exist ", *fd);
+			throw fd_exception("May be it is bug. You try to delete element, that doesn't exist ", *fd);
 		}
 	}
 	else

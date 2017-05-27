@@ -315,7 +315,7 @@ struct notifier: virtual simple_file_descriptor
 		buffer[1] = *fd >> 8;
 		buffer[2] = *fd >> 16;
 		buffer[3] = *fd >> 24;
-		write(*fd, buffer, 6);
+		write(*fd, buffer, 4);
 	}
 };
 

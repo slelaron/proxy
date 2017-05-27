@@ -22,12 +22,9 @@ simple_file_descriptor::~simple_file_descriptor()
 	{
 		if (fcntl(fd, F_GETFD) == -1)
 		{
-			throw fd_exception("Non valid file descriptor ", fd);
+			log("Non valid file descriptor " << fd);
 		}
-		if (close(fd) != 0)
-		{
-			throw fd_exception("Error closing file descriptor ", fd);
-		}
+		close(fd);
 	}
 }
 

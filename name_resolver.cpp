@@ -20,7 +20,7 @@ std::pair <name_resolver::action, simple_file_descriptor::pointer> name_resolver
 	}
 }
 
-boost::optional <std::function <boost::optional <simple_file_descriptor::pointer>()>> name_resolver::get_resolved(simple_file_descriptor::pointer fd, boost::optional <int> port)
+std::unique_ptr <name_resolver::applier> name_resolver::get_resolved(simple_file_descriptor::pointer fd, const boost::optional <int>& port)
 {
 	if (consumers.find(fd) == consumers.end())
 	{
@@ -31,55 +31,66 @@ boost::optional <std::function <boost::optional <simple_file_descriptor::pointer
 	if (consumers.at(fd).second.get() == nullptr)
 	{
 		consumers.erase(consumers.find(fd));
-		return boost::none;
+		return nullptr;
 	}
 	log("Everything is OK with host " << consumers.at(fd).first);
-	auto result = get_result(consumers.at(fd).second.get(), port);
+	auto myaddrinfo = consumers.at(fd).second.get();
 	consumers.erase(consumers.find(fd));
-	return boost::make_optional(result);
+	return std::make_unique <applier> (myaddrinfo, port);
 }
 
-std::function <boost::optional <simple_file_descriptor::pointer>()> name_resolver::get_result(addrinfo* result, boost::optional <int> port)
+name_resolver::applier::applier(addrinfo* result, const boost::optional <int>& port):
+	port(port),
+	valid(true),
+	result(result)
+{}
+
+boost::optional <simple_file_descriptor::pointer> name_resolver::applier::operator()()
 {
-	return [result, port]() -> boost::optional <simple_file_descriptor::pointer>
+	addrinfo* res;
+		
+	int sfd;
+	for (res = result; res != NULL; res = res->ai_next)
 	{
-		addrinfo* res;
-		
-		int sfd;
-		for (res = result; res != NULL; res = res->ai_next)
+		sfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+
+		if (sfd == -1)
+			continue;
+
+		sockaddr_in addr;
+		memset(&addr, 0, sizeof(sockaddr_in));
+		addr = *reinterpret_cast <sockaddr_in*> (res->ai_addr);
+		//in_addr that;
+		//that.s_addr = *res->ai_addr;
+		//addr.sin_family = *res->ai_family;
+		//addr.sin_port = htons(socket_descriptor::NECESSARY_PORT);
+		//addr.sin_addr = that;
+	
+		if (port)
 		{
-			sfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-
-			if (sfd == -1)
-				continue;
-
-			sockaddr_in addr;
-			memset(&addr, 0, sizeof(sockaddr_in));
-			addr = *reinterpret_cast <sockaddr_in*> (res->ai_addr);
-			//in_addr that;
-			//that.s_addr = *res->ai_addr;
-			//addr.sin_family = *res->ai_family;
-			//addr.sin_port = htons(socket_descriptor::NECESSARY_PORT);
-			//addr.sin_addr = that;
-		
-			if (port)
-			{
-				addr.sin_port = htons(*port);
-			}
-
-			if (connect(sfd, reinterpret_cast <sockaddr*>(&addr), sizeof(addr)) != -1)
-				break;
-
-			close(sfd);
+			addr.sin_port = htons(*port);
 		}
 
-		if (res == NULL)
-		{
-			return boost::none;
-		}
+		if (connect(sfd, reinterpret_cast <sockaddr*>(&addr), sizeof(addr)) != -1)
+			break;
 
-		return boost::make_optional(simple_file_descriptor::pointer(sfd));
-	};
+		close(sfd);
+	}
+
+	if (res == NULL)
+	{
+		return boost::none;
+	}
+
+	return boost::make_optional <simple_file_descriptor::pointer>(simple_file_descriptor::pointer(sfd));
+}
+
+name_resolver::applier::~applier()
+{
+	if (valid)
+	{
+		freeaddrinfo(result);
+	}
 }
 
 std::function <addrinfo*()> name_resolver::get_task(std::string host)

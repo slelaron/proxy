@@ -25,8 +25,8 @@ void timer::erase(simple_file_descriptor::pointer fd, int time)
 		auto object = container.upper_bound(std::make_pair(*fd, -1));
 		if (object->first == *fd)
 		{
-			container.erase(object);
 			times.erase(std::make_pair(object->second, time));
+			container.erase(object);
 		}
 		else
 		{

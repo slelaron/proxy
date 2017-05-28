@@ -4,6 +4,8 @@
 #include "simple_file_descriptor.h"
 #include <boost/optional.hpp>
 
+struct cassette;
+
 struct http_executor: io_executor
 {
 	http_executor();
@@ -15,9 +17,11 @@ struct http_executor: io_executor
 	bool is_header_full();
 	std::string get_header();
 
-	const boost::optional <std::string>& get_host();
-	const boost::optional <int>& get_port();
-	const boost::optional <int>& get_length();
+	boost::optional <std::string> get_host() const;
+	boost::optional <int> get_port() const;
+	boost::optional <int> get_length() const;
+
+	friend cassette;
 	
 	protected:
 

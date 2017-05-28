@@ -16,6 +16,7 @@ io_executor::io_executor(io_executor&& another)
 
 int io_executor::read(simple_file_descriptor::pointer fd)
 {
+	log("Read from " << *fd);
 	//log("Read " << delivery.size() << ' ' << start);
 	bool initial_emptiness = (delivery.size() == 0);
 	
@@ -68,6 +69,7 @@ int io_executor::read(simple_file_descriptor::pointer fd)
 
 int io_executor::write(simple_file_descriptor::pointer fd)
 {
+	log("Write from " << *fd);
 	//log("Write " << delivery.size() << ' ' << start);
 	//bool initial_overflow = (delivery.size() - start >= BUFFER_SIZE);
 	if (delivery.size() == 0)

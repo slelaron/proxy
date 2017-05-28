@@ -94,17 +94,63 @@ void http_executor::reset()
 	filled = 0;
 }
 
-const boost::optional <std::string>& http_executor::get_host()
+boost::optional <std::string> http_executor::get_host() const
 {
-	return host;
+	if (end_of_header)
+	{
+		return host;
+	}
+	size_t host_pos = header.find(host_id);
+	size_t host_end = header.find(eos_id, host_pos);
+	if (host_pos == std::string::npos || host_end == std::string::npos)
+	{
+		return boost::none;
+	}
+	else
+	{
+		std::string prehost = header.substr(host_pos + host_id.size(), host_end - host_pos - host_id.size());
+		size_t port_pos = prehost.find(":");
+		
+		if (port_pos != std::string::npos)
+		{
+			return boost::make_optional <std::string> (prehost.substr(0, port_pos));
+		}
+		else
+		{
+			return boost::make_optional <std::string> (prehost);
+		}
+	}
 }
 
-const boost::optional <int>& http_executor::get_port()
+boost::optional <int> http_executor::get_port() const 
 {
-	return port;
+	if (end_of_header)
+	{
+		return port;
+	}
+	size_t host_pos = header.find(host_id);
+	size_t host_end = header.find(eos_id, host_pos);
+	if (host_pos == std::string::npos || host_end == std::string::npos)
+	{
+		return boost::none;
+	}
+	else
+	{
+		std::string prehost = header.substr(host_pos + host_id.size(), host_end - host_pos - host_id.size());
+		size_t port_pos = prehost.find(":");
+		
+		if (port_pos != std::string::npos)
+		{
+			return std::stoi(prehost.substr(port_pos + 1));
+		}
+		else
+		{
+			return boost::none;
+		}
+	}
 }
 
-const boost::optional <int>& http_executor::get_length()
+boost::optional <int> http_executor::get_length() const
 {
 	return length;
 }

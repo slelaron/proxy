@@ -4,6 +4,8 @@
 #include "simple_file_descriptor.h"
 #include "descriptor_action.h"
 
+struct cassette;
+
 struct io_executor
 {
 	static const size_t BUFFER_SIZE = 1024;
@@ -19,6 +21,8 @@ struct io_executor
 	
 	int read(simple_file_descriptor::pointer);
 	int write(simple_file_descriptor::pointer);
+
+	friend cassette;
 
 	protected:
 

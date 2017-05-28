@@ -94,7 +94,7 @@ struct socket_descriptor: virtual simple_file_descriptor,
 			std::vector <first_accessable> vt;
 			//first_accessable accepted = result;
 			vt.emplace_back(result);
-			type_to_accept_functions::template set<0>(vt[0], funcs());
+			type_to_accept_functions::template set<0>(vt[0], funcs(simple_file_descriptor::pointer(result)));
 			return std::move(std::make_pair(std::list <std::pair <simple_file_descriptor::pointer, int>>(), std::move(vt)));
 		});
 	}
@@ -247,6 +247,8 @@ struct everything_executor
 	{
 		int fl = 0;
 		int init_fl = 0;
+
+		log(*fd << " -> " << ((contains_convertible_in_args <readable_tag, Args...>::value == 1) ? "Readable " : "") << ((contains_convertible_in_args <writable_tag, Args...>::value == 1) ? "Writable " : "") << ((contains_convertible_in_args <acceptable_tag, Args...>::value == 1) ? "Acceptable " : ""));
 		
 		set_function <writable_flag, writable_tag, writable>(writer, fl, init_fl, fd);
 		set_function <readable_flag, readable_tag, readable>(reader, fl, init_fl, fd);
@@ -323,6 +325,20 @@ struct everything_executor
 			}
 		}
 
+		if (init & acceptable_flag)
+		{
+			if (res & STOP_READING)
+			{
+				event.events &= ~EPOLLIN;
+				fl &= ~acceptable_flag;
+			}
+			else if (res & START_READING)
+			{
+				event.events |= EPOLLIN;
+				fl |= acceptable_flag;
+			}
+		}
+
 		if (init & writable_flag)
 		{
 			if (res & STOP_WRITING)
@@ -336,7 +352,7 @@ struct everything_executor
 				fl |= writable_flag;
 			}
 		}
-		//log(CYAN << *fd << " transformed to -> " << (((bool)(event.events & EPOLLIN)) ? "In" : "") << ' ' << (((bool)(event.events & EPOLLOUT)) ? "Out" : "") << RESET);
+		log(CYAN << *fd << " transformed to -> " << (((bool)(event.events & EPOLLIN)) ? "In" : "") << ' ' << (((bool)(event.events & EPOLLOUT)) ? "Out" : "") << RESET);
 		return event;
 	}
 
@@ -347,7 +363,10 @@ struct everything_executor
 			auto fd = iter.first;
 
 			if (init_flags.find(*fd) == init_flags.end())
-				continue;
+			{
+				log("Descriptor " << *fd << " doesn't exist!");
+				std::abort();
+			}
 			
 			int init = init_flags.at(*fd);
 			int& fl = flags.at(*fd);
@@ -367,8 +386,9 @@ struct everything_executor
 		epoll_event event[max_events];
 		for (int step = 0; ; step++)
 		{
+			log("Step " << step);
 			int time_to_wait = my_timer.get_time();
-			//log(RED << "Waiting with time " << time_to_wait << RESET);
+			log(RED << "Waiting with time " << time_to_wait << RESET);
 			int cnt = epoll_wait(*epoll_fd, event, max_events, time_to_wait);
 			//log(RED << "Step " << step << RESET);
 			if (cnt == 0)
@@ -379,33 +399,40 @@ struct everything_executor
 			for (int i = 0; i < cnt; i++)
 			{
 				epoll_event current = event[i];
-				//log(CYAN << "Descriptor " << current.data.fd << " -> " << (bool)(current.events & EPOLLIN) << ' ' << (bool)(current.events & EPOLLOUT) << RESET);
+				log(CYAN << "Descriptor " << current.data.fd << " -> " << (bool)(current.events & EPOLLIN) << ' ' << (bool)(current.events & EPOLLOUT) << RESET);
 
 				if (flags.find(current.data.fd) == flags.end())
 				{
 					continue;
 				}
+
+				int fl = flags.at(current.data.fd);
+	
+				log("But " << ((fl & acceptable_flag) ? "acceptable, " : "non acceptable, ") << ((fl & readable_flag) ? "readable, " : "non readable, ") << ((fl & acceptable_flag) ? "writable, " : "non writable, "));
 				
-				int fl = init_flags.at(current.data.fd);
 				if (current.events & EPOLLIN)
 				{
 					acceptable_type result; 
 					if (fl & signalizable_flag)
 					{
+						log("S " << current.data.fd);
 						(*signaler)();
 					}
 					else if (fl & readable_flag)
 					{
+						log("R " << current.data.fd);
 						result = reader.at(current.data.fd)(simple_file_descriptor::pointer(current.data.fd), current);
 					}
 					else if (fl & acceptable_flag)
 					{
+						log("A " << current.data.fd);
 						result = accepter.at(current.data.fd)(simple_file_descriptor::pointer(current.data.fd), current);
 					}
 					after_action(result);
 				}
 				if ((current.events & EPOLLOUT) && (fl & writable_flag))
 				{
+					log("W " << current.data.fd);
 					acceptable_type result = writer.at(current.data.fd)(simple_file_descriptor::pointer(current.data.fd), current);
 					after_action(result);
 				}

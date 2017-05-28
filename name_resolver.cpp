@@ -20,7 +20,7 @@ std::pair <name_resolver::action, simple_file_descriptor::pointer> name_resolver
 	}
 }
 
-std::unique_ptr <name_resolver::applier> name_resolver::get_resolved(simple_file_descriptor::pointer fd, const boost::optional <int>& port)
+std::unique_ptr <name_resolver::applier> name_resolver::get_resolved(simple_file_descriptor::pointer fd)
 {
 	if (consumers.find(fd) == consumers.end())
 	{
@@ -36,16 +36,15 @@ std::unique_ptr <name_resolver::applier> name_resolver::get_resolved(simple_file
 	log("Everything is OK with host " << consumers.at(fd).first);
 	auto myaddrinfo = consumers.at(fd).second.get();
 	consumers.erase(consumers.find(fd));
-	return std::make_unique <applier> (myaddrinfo, port);
+	return std::make_unique <applier> (myaddrinfo);
 }
 
-name_resolver::applier::applier(addrinfo* result, const boost::optional <int>& port):
-	port(port),
+name_resolver::applier::applier(addrinfo* result):
 	valid(true),
 	result(result)
 {}
 
-boost::optional <simple_file_descriptor::pointer> name_resolver::applier::operator()()
+boost::optional <simple_file_descriptor::pointer> name_resolver::applier::operator()(boost::optional <int> port)
 {
 	addrinfo* res;
 		

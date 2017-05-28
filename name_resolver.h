@@ -16,14 +16,13 @@ struct name_resolver
 {
 	struct applier
 	{
-		applier(addrinfo*, const boost::optional <int>&);
+		applier(addrinfo*);
 
-		boost::optional <simple_file_descriptor::pointer> operator()();
+		boost::optional <simple_file_descriptor::pointer> operator()(boost::optional <int> port);
 
 		~applier();
 
 		private:
-		boost::optional <int> port;
 		bool valid;
 		addrinfo* result;
 	};
@@ -40,7 +39,7 @@ struct name_resolver
 	
 	std::pair <name_resolver::action, simple_file_descriptor::pointer> resolve(std::string);
 
-	std::unique_ptr <applier> get_resolved(simple_file_descriptor::pointer, const boost::optional <int>&);
+	std::unique_ptr <applier> get_resolved(simple_file_descriptor::pointer);
 
 	private:
 

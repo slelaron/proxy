@@ -6,6 +6,7 @@
 #include <fcntl.h>
 
 #include "log.h"
+#include "cassette.h"
 
 template <typename T, unsigned item = 0>
 struct from_container_erasable

@@ -33,6 +33,9 @@ struct cassette
 	result_type stop_server();
 	result_type start_server();
 
+	void invalidate_client();
+	void invalidate_server();
+
 	bool need_new();
 
 	bool server_still_alive();

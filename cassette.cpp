@@ -218,6 +218,17 @@ cassette::result_type cassette::write_client()
 	return obj;
 }
 
+void cassette::invalidate_server()
+{
+	server.reset();
+}
+
+void cassette::invalidate_client()
+{
+	client.reset();
+	server.reset();
+}
+
 cassette::result_type cassette::write_server()
 {
 	int client_ret = 0, server_ret = 0;

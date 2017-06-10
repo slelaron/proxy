@@ -134,8 +134,6 @@ cassette::result_type cassette::read_server()
 		server_ret |= (out.delivery.size() < out.BUFFER_SIZE) ? descriptor_action::START_READING : descriptor_action::STOP_READING;
 		client_ret |= (out.delivery.size() > 0) ? descriptor_action::START_WRITING : descriptor_action::STOP_WRITING;
 
-		log("Client " << client << " Server " << server);
-		
 		if (server)
 		{
 			server_ret = get_flags(server_flags, server_ret);
@@ -188,7 +186,6 @@ cassette::result_type cassette::write_client()
 		server_ret |= (out.delivery.size() < out.BUFFER_SIZE) ? descriptor_action::START_READING : descriptor_action::STOP_READING;
 		client_ret |= (out.delivery.size() > 0) ? descriptor_action::START_WRITING : descriptor_action::STOP_WRITING;
 
-		log("Client " << client << " Server " << server);
 		if (server)
 		{
 			server_ret = get_flags(server_flags, server_ret);
@@ -244,7 +241,6 @@ cassette::result_type cassette::write_server()
 		client_ret |= (in.delivery.size() < in.BUFFER_SIZE) ? descriptor_action::START_READING : descriptor_action::STOP_READING;
 		server_ret |= (in.delivery.size() > 0) ? descriptor_action::START_WRITING : descriptor_action::STOP_WRITING;
 
-		log("Client " << client << " Server " << server);
 		if (server)
 		{
 			server_ret = get_flags(server_flags, server_ret);

@@ -23,7 +23,7 @@ int main()
 	socket_descriptor <non_blocking, acceptable <time_dependent_compile <10000>, non_blocking, writable, acceptable <non_blocking, auto_closable, acceptable <time_dependent_compile <15000>, non_blocking, readable, writable>>>> needed_fd;
 	everything_executor executor;
 
-	typedef std::list <std::pair <std::shared_ptr <cassette>, boost::optional <int>>> type_in_mp;
+	typedef std::map <simple_file_descriptor::pointer, std::pair <std::shared_ptr <cassette>, boost::optional <int>>> type_in_mp;
 	typedef std::map <simple_file_descriptor::pointer, type_in_mp> mp_type; 
 	
 	std::shared_ptr <mp_type> mp = std::make_shared <mp_type>();

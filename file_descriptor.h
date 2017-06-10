@@ -110,6 +110,7 @@ struct everything_executor
 	static const int auto_closable_flag = 32;
 
 	static const int max_events = 2048;
+	static const int initial_flags = EPOLLRDHUP;
 
 	typedef std::list <std::pair <simple_file_descriptor::pointer, int>> acceptable_type;
 	typedef std::function <acceptable_type(simple_file_descriptor::pointer, epoll_event)> executable_function;
@@ -352,7 +353,7 @@ struct everything_executor
 				fl |= writable_flag;
 			}
 		}
-		log(CYAN << *fd << " transformed to -> " << (((bool)(event.events & EPOLLIN)) ? "In" : "") << ' ' << (((bool)(event.events & EPOLLOUT)) ? "Out" : "") << RESET);
+		log(CYAN << *fd << " transformed to " << (((bool)(event.events & EPOLLIN)) ? "In" : "") << ' ' << (((bool)(event.events & EPOLLOUT)) ? "Out" : "") << RESET);
 		return event;
 	}
 
@@ -408,24 +409,24 @@ struct everything_executor
 
 				int fl = flags.at(current.data.fd);
 	
-				log("But " << ((fl & acceptable_flag) ? "acceptable, " : "non acceptable, ") << ((fl & readable_flag) ? "readable, " : "non readable, ") << ((fl & acceptable_flag) ? "writable, " : "non writable, "));
+				//log("But " << ((fl & acceptable_flag) ? "acceptable, " : "non acceptable, ") << ((fl & readable_flag) ? "readable, " : "non readable, ") << ((fl & acceptable_flag) ? "writable, " : "non writable, "));
 				
 				if (current.events & EPOLLIN)
 				{
 					acceptable_type result; 
 					if (fl & signalizable_flag)
 					{
-						log("S " << current.data.fd);
+						//log("S " << current.data.fd);
 						(*signaler)();
 					}
 					else if (fl & readable_flag)
 					{
-						log("R " << current.data.fd);
+						//log("R " << current.data.fd);
 						result = reader.at(current.data.fd)(simple_file_descriptor::pointer(current.data.fd), current);
 					}
 					else if (fl & acceptable_flag)
 					{
-						log("A " << current.data.fd);
+						//log("A " << current.data.fd);
 						result = accepter.at(current.data.fd)(simple_file_descriptor::pointer(current.data.fd), current);
 					}
 					after_action(result);
@@ -451,7 +452,7 @@ struct everything_executor
 	{
 		epoll_event event;
 		event.data.fd = fd;
-		event.events = 0;
+		event.events = initial_flags;
 		//event.events |= EPOLLET;
 		if (fl & (readable_flag | acceptable_flag | signalizable_flag))
 		{

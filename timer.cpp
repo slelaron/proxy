@@ -9,7 +9,7 @@ timer::timer()
 
 void timer::add(simple_file_descriptor::pointer fd, int time)
 {
-	int current_time = time + (int)((double)clock() / CLOCKS_PER_SEC * 1000);
+	int current_time = time + 1000 * clock() / CLOCKS_PER_SEC;
 	if (descriptors.find(time) == descriptors.end() || (descriptors.find(time) != descriptors.end() && descriptors.at(time).size() == 0))
 	{
 		times.insert({current_time, time});
@@ -27,6 +27,10 @@ void timer::erase(simple_file_descriptor::pointer fd, int time)
 		{
 			times.erase(std::make_pair(object->second, time));
 			container.erase(object);
+			if (container.size() > 0)
+			{
+				times.insert({container.begin()->second, time});
+			}
 		}
 		else
 		{
@@ -59,5 +63,5 @@ int timer::get_time()
 	{
 		return -1;
 	}
-	return std::max(times.begin()->first - (int)((double)clock() / CLOCKS_PER_SEC * 1000), 0);
+	return std::max(times.begin()->first - (int)(1000 * clock() / CLOCKS_PER_SEC), 0);
 }

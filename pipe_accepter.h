@@ -16,7 +16,7 @@ struct pipe_accepter
 {
 	typedef std::list <std::pair <simple_file_descriptor::pointer, int>> result_type;
 	typedef file_descriptor <time_dependent_compile <15000>, non_blocking, readable, writable> accept_type;
-	typedef std::list <std::pair <std::shared_ptr <cassette>, boost::optional <int>>> type_in_map;
+	typedef std::map <simple_file_descriptor::pointer, std::pair <std::shared_ptr <cassette>, boost::optional <int>>> type_in_map;
 	
 	pipe_accepter(std::shared_ptr <std::map <simple_file_descriptor::pointer, type_in_map>> map, std::shared_ptr <name_resolver> resolver):
 		map(map),
@@ -36,8 +36,9 @@ struct pipe_accepter
 
 			if (func_to_apply != nullptr)
 			{
-				for (auto element: map->at(fd))
+				for (auto key_and_value: map->at(fd))
 				{
+					auto& element = key_and_value.second;
 					auto next = func_to_apply->operator()(element.second);
 
 					if (next)

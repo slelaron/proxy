@@ -400,7 +400,7 @@ struct everything_executor
 			for (int i = 0; i < cnt; i++)
 			{
 				epoll_event current = event[i];
-				log(CYAN << "Descriptor " << current.data.fd << " -> " << (bool)(current.events & EPOLLIN) << ' ' << (bool)(current.events & EPOLLOUT) << RESET);
+				log(CYAN << "Descriptor " << current.data.fd << " -> " << (((bool)(current.events & EPOLLIN)) ? "EPOLLIN " : "") << (((bool)(current.events & EPOLLOUT)) ? "EPOLLOUT" : "") << (((bool)(current.events & EPOLLRDHUP)) ? "EPOLLRDHUP" : "") << RESET);
 
 				if (flags.find(current.data.fd) == flags.end())
 				{
@@ -408,10 +408,11 @@ struct everything_executor
 				}
 
 				int fl = flags.at(current.data.fd);
+				int init_fl = init_flags.at(current.data.fd);
 	
 				//log("But " << ((fl & acceptable_flag) ? "acceptable, " : "non acceptable, ") << ((fl & readable_flag) ? "readable, " : "non readable, ") << ((fl & acceptable_flag) ? "writable, " : "non writable, "));
 				
-				if (current.events & EPOLLIN)
+				if (current.events & (EPOLLIN | EPOLLRDHUP))
 				{
 					acceptable_type result; 
 					if (fl & signalizable_flag)
@@ -419,19 +420,19 @@ struct everything_executor
 						//log("S " << current.data.fd);
 						(*signaler)();
 					}
-					else if (fl & readable_flag)
+					else if ((fl & readable_flag) || ((init_fl & readable_flag) && (current.events & EPOLLRDHUP)))
 					{
 						//log("R " << current.data.fd);
 						result = reader.at(current.data.fd)(simple_file_descriptor::pointer(current.data.fd), current);
 					}
-					else if (fl & acceptable_flag)
+					else if (fl & acceptable_flag || ((init_fl & acceptable_flag) && (current.events & EPOLLRDHUP)))
 					{
 						//log("A " << current.data.fd);
 						result = accepter.at(current.data.fd)(simple_file_descriptor::pointer(current.data.fd), current);
 					}
 					after_action(result);
 				}
-				if ((current.events & EPOLLOUT) && (fl & writable_flag))
+				if (init_flags.find(current.data.fd) != init_flags.end() && (current.events & EPOLLOUT) && (fl & writable_flag))
 				{
 					log("W " << current.data.fd);
 					acceptable_type result = writer.at(current.data.fd)(simple_file_descriptor::pointer(current.data.fd), current);

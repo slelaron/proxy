@@ -17,7 +17,7 @@ http_executor::http_executor():
 
 int http_executor::read(simple_file_descriptor::pointer smpl)
 {
-	int result = static_cast <io_executor*>(this)->read(smpl);
+	int result = io_executor::read(smpl);
 
 	if (!end_of_header)
 	{
@@ -78,7 +78,11 @@ bool http_executor::status()
 {
 	if (length)
 	{
-		assert(filled <= *length);
+		if (filled <= *length)
+		{
+			std::cerr << filled << ' ' << *length << std::endl;
+			std::abort();
+		}
 		return filled == *length;
 	}
 	return end_of_header;
@@ -100,6 +104,11 @@ boost::optional <std::string> http_executor::get_host() const
 	{
 		return host;
 	}
+
+	//Need to check it carefully!!!
+	//If header isn't ready, I won't find host if it exists.
+	//Oops, I checked it. Everything is OK.
+	
 	size_t host_pos = header.find(host_id);
 	size_t host_end = header.find(eos_id, host_pos);
 	if (host_pos == std::string::npos || host_end == std::string::npos)

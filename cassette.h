@@ -40,6 +40,8 @@ struct cassette
 
 	bool server_still_alive();
 
+	result_type close();
+
 	private:
 
 	int get_flags(int& flags, int need);
@@ -54,4 +56,8 @@ struct cassette
 
 	http_executor in;
 	io_executor out;
+	
+	result_type read(boost::optional <simple_file_descriptor::pointer>&, boost::optional <simple_file_descriptor::pointer>&, int&, int&, std::string, std::string, io_executor&, io_executor&);
+
+	result_type write(boost::optional <simple_file_descriptor::pointer>&, boost::optional <simple_file_descriptor::pointer>&, int&, int&, std::string, std::string, io_executor&, io_executor&);
 };

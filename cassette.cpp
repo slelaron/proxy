@@ -57,115 +57,116 @@ cassette::result_type cassette::set_server_socket(simple_file_descriptor::pointe
 	return set_socket(sr, server, server_flags);
 }
 
-cassette::result_type cassette::read_client()
+cassette::result_type cassette::read(boost::optional <simple_file_descriptor::pointer>& from, boost::optional <simple_file_descriptor::pointer>& to, int& from_flags, int& to_flags, std::string from_name, std::string to_name, io_executor& from_io, io_executor& to_io)
 {
-	int client_ret = 0, server_ret = 0;
+	int from_ret = 0, to_ret = 0;
 
 	result_type obj;
 
-	log(this << " Server " << ((server) ? **server : -1) << " flags: " << server_flags << " | Client " << ((client) ? **client : -1) << " flags: " << client_flags);
-	if (client)
+	log(to_name << ' ' << ((to) ? **to : -1) << " flags: " << to_flags << " | " << from_name << ' ' << ((from) ? **from : -1) << " flags: " << from_flags);
+	if (from)
 	{
-		log("Client read");
-		int res = in.read(**client);
+		log(from_name << " read");
+		int res = from_io.read(**from);
 		if (res & descriptor_action::CLOSING_SOCKET)
 		{
-			client_ret |= descriptor_action::CLOSING_SOCKET;
-			server_ret |= descriptor_action::CLOSING_SOCKET;
+			from_ret |= descriptor_action::CLOSING_SOCKET;
+			to_ret |= descriptor_action::CLOSING_SOCKET;
 		}
-		log("Delivery size " << in.delivery.size());
-		client_ret |= (in.delivery.size() < in.BUFFER_SIZE) ? descriptor_action::START_READING : descriptor_action::STOP_READING;
-		server_ret |= (in.delivery.size() > 0) ? descriptor_action::START_WRITING : descriptor_action::STOP_WRITING;
+		log("Delivery size " << from_io.delivery.size());
+		from_ret |= (from_io.delivery.size() < from_io.BUFFER_SIZE) ? descriptor_action::START_READING : descriptor_action::STOP_READING;
+		to_ret |= (from_io.delivery.size() > 0) ? descriptor_action::START_WRITING : descriptor_action::STOP_WRITING;
 
-		if (server)
+		if (to)
 		{
-			server_ret = get_flags(server_flags, server_ret);
-			if (server_ret)
+			to_ret = get_flags(to_flags, to_ret);
+			if (to_ret)
 			{
-				obj.push_back({*server, server_ret});
-				log("Server " << **server << ' ' << ((server_ret & START_READING) ? "START_READING " : "") << ((server_ret & STOP_READING) ? "STOP_READING " : "") << ((server_ret & START_WRITING) ? "START_WRITING " : "") << ((server_ret & STOP_WRITING) ? "STOP_WRITING " : "") << ((server_ret & CLOSING_SOCKET) ? "CLOSING_SOCKET " : ""));
-				if (server_ret & descriptor_action::CLOSING_SOCKET)
+				obj.push_back({*to, to_ret});
+				log(to_name << ' ' << **to << ' ' << ((to_ret & START_READING) ? "START_READING " : "") << ((to_ret & STOP_READING) ? "STOP_READING " : "") << ((to_ret & START_WRITING) ? "START_WRITING " : "") << ((to_ret & STOP_WRITING) ? "STOP_WRITING " : "") << ((to_ret & CLOSING_SOCKET) ? "CLOSING_SOCKET " : ""));
+				if (to_ret & descriptor_action::CLOSING_SOCKET)
 				{
-					server.reset();
+					to.reset();
 				}
 			}
 		}
-		if (client)
+		if (from)
 		{
-			client_ret = get_flags(client_flags, client_ret);
-			if (client_ret)
+			from_ret = get_flags(from_flags, from_ret);
+			if (from_ret)
 			{
-				obj.push_back({*client, client_ret});
-				log("Client " << **client << ' ' << ((client_ret & START_READING) ? "START_READING " : "") << ((client_ret & STOP_READING) ? "STOP_READING " : "") << ((client_ret & START_WRITING) ? "START_WRITING " : "") << ((client_ret & STOP_WRITING) ? "STOP_WRITING " : "") << ((client_ret & CLOSING_SOCKET) ? "CLOSING_SOCKET " : ""));
-				if (client_ret & descriptor_action::CLOSING_SOCKET)
+				obj.push_back({*from, from_ret});
+				log(from_name << ' ' << **from << ' ' << ((from_ret & START_READING) ? "START_READING " : "") << ((from_ret & STOP_READING) ? "STOP_READING " : "") << ((from_ret & START_WRITING) ? "START_WRITING " : "") << ((from_ret & STOP_WRITING) ? "STOP_WRITING " : "") << ((from_ret & CLOSING_SOCKET) ? "CLOSING_SOCKET " : ""));
+				if (from_ret & descriptor_action::CLOSING_SOCKET)
 				{
-					client.reset();
+					from.reset();
 				}
 			}
 		}
 	}
+	//Think about following part of code!
+	//Don't you find it strange?
 	else
 	{
-		int res = get_flags(client_flags, descriptor_action::STOP_READING);
-		obj.push_back({*client, res});
-		log("Client " << **client << ' ' << ((client_ret & START_READING) ? "START_READING " : "") << ((client_ret & STOP_READING) ? "STOP_READING " : "") << ((client_ret & START_WRITING) ? "START_WRITING " : "") << ((client_ret & STOP_WRITING) ? "STOP_WRITING " : "") << ((client_ret & CLOSING_SOCKET) ? "CLOSING_SOCKET " : ""));
+		int res = get_flags(from_flags, descriptor_action::STOP_READING);
+		obj.push_back({*from, res});
+		log(from_name << ' ' << **from << ' ' << ((from_ret & START_READING) ? "START_READING " : "") << ((from_ret & STOP_READING) ? "STOP_READING " : "") << ((from_ret & START_WRITING) ? "START_WRITING " : "") << ((from_ret & STOP_WRITING) ? "STOP_WRITING " : "") << ((from_ret & CLOSING_SOCKET) ? "CLOSING_SOCKET " : ""));
 	}
 
 	return obj;
 }
 
+cassette::result_type cassette::read_client()
+{
+	return read(client, server, client_flags, server_flags, "Client", "Server", in, out);
+}
+
 cassette::result_type cassette::read_server()
 {
-	int client_ret = 0, server_ret = 0;
+	return read(server, client, server_flags, client_flags, "Server", "Client", out, in);
+}
 
+cassette::result_type cassette::write(boost::optional <simple_file_descriptor::pointer>& from, boost::optional <simple_file_descriptor::pointer>& to, int& from_flags, int& to_flags, std::string from_name, std::string to_name, io_executor& from_io, io_executor& to_io)
+{
+	int from_ret = 0, to_ret = 0;
+	
 	result_type obj;
 
-	log(this << " Server " << ((server) ? **server : -1) << " flags: " << server_flags << " | Client " << ((client) ? **client : -1) << " flags: " << client_flags);
-	if (server)
+	log(to_name << ' ' << ((to) ? **to : -1) << " flags: " << to_flags << " | " << from_name << ' ' << ((from) ? **from : -1) << " flags: " << from_flags);
+	if (from)
 	{
-		log("Server read");
-		int res = out.read(**server);
-		if (res & descriptor_action::CLOSING_SOCKET)
-		{
-			client_ret |= descriptor_action::CLOSING_SOCKET;
-			server_ret |= descriptor_action::CLOSING_SOCKET;
-		}
-		log("Delivery size " << out.delivery.size());
-		server_ret |= (out.delivery.size() < out.BUFFER_SIZE) ? descriptor_action::START_READING : descriptor_action::STOP_READING;
-		client_ret |= (out.delivery.size() > 0) ? descriptor_action::START_WRITING : descriptor_action::STOP_WRITING;
+		log(from_name << " write");
+		to_io.write(**from);
+		log("Delivery size " << to_io.delivery.size());
+		to_ret |= (to_io.delivery.size() < to_io.BUFFER_SIZE) ? descriptor_action::START_READING : descriptor_action::STOP_READING;
+		from_ret |= (to_io.delivery.size() > 0) ? descriptor_action::START_WRITING : descriptor_action::STOP_WRITING;
 
-		if (server)
+		if (to)
 		{
-			server_ret = get_flags(server_flags, server_ret);
-			if (server_ret)
+			to_ret = get_flags(to_flags, to_ret);
+			if (to_ret)
 			{
-				obj.push_back({*server, server_ret});
-				log("Server " << **server << ' ' << ((server_ret & START_READING) ? "START_READING " : "") << ((server_ret & STOP_READING) ? "STOP_READING " : "") << ((server_ret & START_WRITING) ? "START_WRITING " : "") << ((server_ret & STOP_WRITING) ? "STOP_WRITING " : "") << ((server_ret & CLOSING_SOCKET) ? "CLOSING_SOCKET " : ""));
-				if (server_ret & descriptor_action::CLOSING_SOCKET)
-				{
-					server.reset();
-				}
+				obj.push_back({*to, to_ret});
+				log(to_name << ' ' << **to << ' ' << ((to_ret & START_READING) ? "START_READING " : "") << ((to_ret & STOP_READING) ? "STOP_READING " : "") << ((to_ret & START_WRITING) ? "START_WRITING " : "") << ((to_ret & STOP_WRITING) ? "STOP_WRITING " : ""));
 			}
 		}
-		if (client)
+		if (from)
 		{
-			client_ret = get_flags(client_flags, client_ret);
-			if (client_ret)
+			from_ret = get_flags(from_flags, from_ret);
+			if (from_ret)
 			{
-				obj.push_back({*client, client_ret});
-				log("Client " << **client << ' ' << ((client_ret & START_READING) ? "START_READING " : "") << ((client_ret & STOP_READING) ? "STOP_READING " : "") << ((client_ret & START_WRITING) ? "START_WRITING " : "") << ((client_ret & STOP_WRITING) ? "STOP_WRITING " : "") << ((client_ret & CLOSING_SOCKET) ? "CLOSING_SOCKET " : ""));
-				if (client_ret & descriptor_action::CLOSING_SOCKET)
-				{
-					client.reset();
-				}
+				obj.push_back({*from, from_ret});
+				log(from_name << ' ' << **from << ' ' << ((from_ret & START_READING) ? "START_READING " : "") << ((from_ret & STOP_READING) ? "STOP_READING " : "") << ((from_ret & START_WRITING) ? "START_WRITING " : "") << ((from_ret & STOP_WRITING) ? "STOP_WRITING " : ""));
 			}
 		}
 	}
+	//Think about following part of code!
+	//Don't you find it strange?
 	else
 	{
-		int res = get_flags(server_flags, descriptor_action::STOP_READING);
-		obj.push_back({*server, res});
-		log("Server " << **server << ' ' << ((server_ret & START_READING) ? "START_READING " : "") << ((server_ret & STOP_READING) ? "STOP_READING " : "") << ((server_ret & START_WRITING) ? "START_WRITING " : "") << ((server_ret & STOP_WRITING) ? "STOP_WRITING " : "") << ((server_ret & CLOSING_SOCKET) ? "CLOSING_SOCKET " : ""));
+		int res = get_flags(from_flags, descriptor_action::STOP_WRITING);
+		obj.push_back({*from, res});
+		log(from_name << ' ' << **from << ' ' << ((from_ret & START_READING) ? "START_READING " : "") << ((from_ret & STOP_READING) ? "STOP_READING " : "") << ((from_ret & START_WRITING) ? "START_WRITING " : "") << ((from_ret & STOP_WRITING) ? "STOP_WRITING " : ""));
 	}
 
 	return obj;
@@ -173,46 +174,12 @@ cassette::result_type cassette::read_server()
 
 cassette::result_type cassette::write_client()
 {
-	int client_ret = 0, server_ret = 0;
-	
-	result_type obj;
+	return write(client, server, client_flags, server_flags, "Client", "Server", in, out);
+}
 
-	log(this << " Server " << ((server) ? **server : -1) << " flags: " << server_flags << " | Client " << ((client) ? **client : -1) << " flags: " << client_flags);
-	if (client)
-	{
-		log("Client write");
-		out.write(**client);
-		log("Delivery size " << out.delivery.size());
-		server_ret |= (out.delivery.size() < out.BUFFER_SIZE) ? descriptor_action::START_READING : descriptor_action::STOP_READING;
-		client_ret |= (out.delivery.size() > 0) ? descriptor_action::START_WRITING : descriptor_action::STOP_WRITING;
-
-		if (server)
-		{
-			server_ret = get_flags(server_flags, server_ret);
-			if (server_ret)
-			{
-				obj.push_back({*server, server_ret});
-				log("Server " << **server << ' ' << ((server_ret & START_READING) ? "START_READING " : "") << ((server_ret & STOP_READING) ? "STOP_READING " : "") << ((server_ret & START_WRITING) ? "START_WRITING " : "") << ((server_ret & STOP_WRITING) ? "STOP_WRITING " : ""));
-			}
-		}
-		if (client)
-		{
-			client_ret = get_flags(client_flags, client_ret);
-			if (client_ret)
-			{
-				obj.push_back({*client, client_ret});
-				log("Client " << **client << ' ' << ((client_ret & START_READING) ? "START_READING " : "") << ((client_ret & STOP_READING) ? "STOP_READING " : "") << ((client_ret & START_WRITING) ? "START_WRITING " : "") << ((client_ret & STOP_WRITING) ? "STOP_WRITING " : ""));
-			}
-		}
-	}
-	else
-	{
-		int res = get_flags(client_flags, descriptor_action::STOP_WRITING);
-		obj.push_back({*client, res});
-		log("Client " << **client << ' ' << ((client_ret & START_READING) ? "START_READING " : "") << ((client_ret & STOP_READING) ? "STOP_READING " : "") << ((client_ret & START_WRITING) ? "START_WRITING " : "") << ((client_ret & STOP_WRITING) ? "STOP_WRITING " : ""));
-	}
-
-	return obj;
+cassette::result_type cassette::write_server()
+{
+	return write(server, client, server_flags, client_flags, "Server", "Client", out, in);
 }
 
 void cassette::invalidate_server()
@@ -223,50 +190,20 @@ void cassette::invalidate_server()
 void cassette::invalidate_client()
 {
 	client.reset();
-	server.reset();
 }
 
-cassette::result_type cassette::write_server()
+cassette::result_type cassette::close()
 {
-	int client_ret = 0, server_ret = 0;
-
 	result_type obj;
-
-	log(this << " Server " << ((server) ? **server : -1) << " flags: " << server_flags << " | Client " << ((client) ? **client : -1) << " flags: " << client_flags);
+	if (client)
+	{
+		obj.push_back({*client, descriptor_action::CLOSING_SOCKET});
+	}
+	
 	if (server)
 	{
-		log("Server write");
-		in.write(**server);
-		log("Delivery size " << in.delivery.size());
-		client_ret |= (in.delivery.size() < in.BUFFER_SIZE) ? descriptor_action::START_READING : descriptor_action::STOP_READING;
-		server_ret |= (in.delivery.size() > 0) ? descriptor_action::START_WRITING : descriptor_action::STOP_WRITING;
-
-		if (server)
-		{
-			server_ret = get_flags(server_flags, server_ret);
-			if (server_ret)
-			{
-				obj.push_back({*server, server_ret});
-				log("Server " << **server << ' ' << ((server_ret & START_READING) ? "START_READING " : "") << ((server_ret & STOP_READING) ? "STOP_READING " : "") << ((server_ret & START_WRITING) ? "START_WRITING " : "") << ((server_ret & STOP_WRITING) ? "STOP_WRITING " : ""));
-			}
-		}
-		if (client)
-		{
-			client_ret = get_flags(client_flags, client_ret);
-			if (client_ret)
-			{
-				obj.push_back({*client, client_ret});
-				log("Client " << **client << ' ' << ((client_ret & START_READING) ? "START_READING " : "") << ((client_ret & STOP_READING) ? "STOP_READING " : "") << ((client_ret & START_WRITING) ? "START_WRITING " : "") << ((client_ret & STOP_WRITING) ? "STOP_WRITING " : ""));
-			}
-		}
+		obj.push_back({*server, descriptor_action::CLOSING_SOCKET});
 	}
-	else
-	{
-		int res = get_flags(server_flags, descriptor_action::STOP_WRITING);
-		obj.push_back({*server, res});
-		log("Server " << **server << ' ' << ((server_ret & START_READING) ? "START_READING " : "") << ((server_ret & STOP_READING) ? "STOP_READING " : "") << ((server_ret & START_WRITING) ? "START_WRITING " : "") << ((server_ret & STOP_WRITING) ? "STOP_WRITING " : ""));
-	}
-
 	return obj;
 }
 
@@ -340,5 +277,5 @@ bool cassette::need_new()
 
 bool cassette::server_still_alive()
 {
-	return server;
+	return static_cast <bool> (server);
 }

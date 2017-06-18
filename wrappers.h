@@ -260,12 +260,41 @@ struct acceptable: virtual executable_tag,
 		parent(std::move(another))
 	{}
 
-	void set_accept(std::function<acceptable_type(simple_file_descriptor::pointer, epoll_event)> func)
+	void set_accept(std::function <acceptable_type(simple_file_descriptor::pointer, epoll_event)> func)
 	{
 		this->func = func;
 	}
 
 	std::function <acceptable_type(simple_file_descriptor::pointer, epoll_event)> get_accept() const
+	{
+		return this->func;
+	}
+};
+
+struct closable_tag: virtual executable_tag
+{};
+
+struct closable: virtual executable_tag,
+					virtual closable_tag,
+					executable <std::list <std::pair <simple_file_descriptor::pointer, int>>, simple_file_descriptor::pointer>
+{
+	typedef std::list <std::pair <simple_file_descriptor::pointer, int>> acceptable_type;
+	typedef executable <acceptable_type, simple_file_descriptor::pointer> parent;
+
+	closable(int fd):
+		parent(fd)
+	{}
+
+	closable(closable&& another):
+		parent(std::move(another))
+	{}
+
+	void set_close(std::function <acceptable_type(simple_file_descriptor::pointer)> func)
+	{
+		this->func = func;
+	}
+
+	std::function <acceptable_type(simple_file_descriptor::pointer)> get_close() const
 	{
 		return this->func;
 	}

@@ -8,7 +8,7 @@ struct cassette;
 
 struct io_executor
 {
-	static const size_t BUFFER_SIZE = 1024;
+	static const size_t BUFFER_SIZE = 4096;
 	
 	io_executor();
 	io_executor(io_executor&& another);
@@ -19,8 +19,8 @@ struct io_executor
 	void put_info(const std::string&);
 	void put_info(std::string&&);
 	
-	int read(simple_file_descriptor::pointer);
-	int write(simple_file_descriptor::pointer);
+	virtual int read(simple_file_descriptor::pointer);
+	virtual int write(simple_file_descriptor::pointer);
 
 	friend cassette;
 

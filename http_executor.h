@@ -10,7 +10,7 @@ struct http_executor: io_executor
 {
 	http_executor();
 	
-	int read(simple_file_descriptor::pointer);
+	virtual int read(simple_file_descriptor::pointer);
 
 	bool status();
 	void reset();

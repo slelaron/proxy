@@ -4,10 +4,12 @@
 #include <cassert>
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 #include <string.h>
 #include <memory>
 #include <list>
 #include <set>
+#include <cstdlib>
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -64,10 +66,15 @@ struct socket_descriptor: virtual simple_file_descriptor,
 		sockaddr_in addr;
 		in_addr that;
 		that.s_addr = INADDR_ANY;
+		memset(&addr, 0, sizeof(addr));
 		addr.sin_family = AF_INET;
 		addr.sin_port = htons(NECESSARY_PORT);
 		addr.sin_addr = that;
-		bind(**this, (sockaddr*)&addr, sizeof(sockaddr_in));
+		int possible_error = bind(**this, (sockaddr*)&addr, sizeof(sockaddr_in));
+		if (possible_error)
+		{
+			std::abort();
+		}
 		listen(**this, BACKLOGMAX);
 	}
 
@@ -108,12 +115,14 @@ struct everything_executor
 	static const int timer_flag = 8;
 	static const int signalizable_flag = 16;
 	static const int auto_closable_flag = 32;
+	static const int closable_flag = 64;
 
 	static const int max_events = 2048;
-	static const int initial_flags = EPOLLRDHUP;
+	static const int initial_flags = 0;
 
 	typedef std::list <std::pair <simple_file_descriptor::pointer, int>> acceptable_type;
 	typedef std::function <acceptable_type(simple_file_descriptor::pointer, epoll_event)> executable_function;
+	typedef std::function <acceptable_type(simple_file_descriptor::pointer)> executable_function_without_epoll_event;
 	
 	everything_executor():
 		epoll_fd(epoll_create1(0))
@@ -244,26 +253,47 @@ struct everything_executor
 	}
 
 	template <typename... Args>
+	typename std::enable_if <contains_convertible_in_args <closable_tag, Args...>::value < 1, void>::type
+	set_close(std::unordered_map <int, executable_function_without_epoll_event>& storage, int& fl, int& init_fl, const file_descriptor <Args...>& fd)
+	{}
+
+	template <typename... Args>
+	typename std::enable_if <contains_convertible_in_args <closable_tag, Args...>::value == 1, void>::type
+	set_close(std::unordered_map <int, executable_function_without_epoll_event>& storage, int& fl, int& init_fl, const file_descriptor <Args...>& fd)
+	{
+		fl |= closable_flag;
+		init_fl |= closable_flag;
+		storage.insert({*fd, fd.get_close()});
+	}
+
+	template <typename... Args>
 	int add_file_descriptor(file_descriptor <Args...> fd)
 	{
 		int fl = 0;
 		int init_fl = 0;
 
-		log(*fd << " -> " << ((contains_convertible_in_args <readable_tag, Args...>::value == 1) ? "Readable " : "") << ((contains_convertible_in_args <writable_tag, Args...>::value == 1) ? "Writable " : "") << ((contains_convertible_in_args <acceptable_tag, Args...>::value == 1) ? "Acceptable " : ""));
+		log(*fd << " -> " << ((contains_convertible_in_args <readable_tag, Args...>::value == 1) ? "Readable " : "") << ((contains_convertible_in_args <writable_tag, Args...>::value == 1) ? "Writable " : "") << ((contains_convertible_in_args <acceptable_tag, Args...>::value == 1) ? "Acceptable " : "") << ((contains_convertible_in_args <closable_tag, Args...>::value == 1) ? "Closable " : ""));
 		
 		set_function <writable_flag, writable_tag, writable>(writer, fl, init_fl, fd);
 		set_function <readable_flag, readable_tag, readable>(reader, fl, init_fl, fd);
 		set_accept(fl, init_fl, fd);
 		set_signal(fl, init_fl, fd);
+		set_close(closer, fl, init_fl, fd);
 		update_timer(fl, init_fl, fd);
 
 		fl |= (contains_in_args <auto_closable, Args...>::value) ? auto_closable_flag : 0;
 		init_fl |= (contains_in_args <auto_closable, Args...>::value) ? auto_closable_flag : 0;
+
+		assert(flags.find(*fd) == flags.end());
+		assert(init_flags.find(*fd) == init_flags.end());
 		
 		flags.insert({*fd, fl});
 		init_flags.insert({*fd, init_fl});
 		
 		epoll_event event = set_epoll_flags(*fd, fl);
+
+		log(CYAN << "Adding descriptor " << event.data.fd << " -> " << (((bool)(event.events & EPOLLIN)) ? "EPOLLIN " : "") << (((bool)(event.events & EPOLLOUT)) ? "EPOLLOUT " : "") << (((bool)(event.events & EPOLLRDHUP)) ? "EPOLLRDHUP " : "") << (((bool)(event.events & EPOLLHUP)) ? "EPOLLHUP " : "") << (((bool)(event.events & EPOLLERR)) ? "EPOLLERR" : "") << RESET);
+		
 		epoll_ctl(*epoll_fd, EPOLL_CTL_ADD, *fd, &event);
 		
 		descriptors.insert(std::make_pair(*fd, std::make_unique <file_descriptor <Args...>> (std::move(fd))));
@@ -280,10 +310,15 @@ struct everything_executor
 		static const bool need_to_erase_from_timer = false;
 	};
 
-	template <typename tag = erasing_by_closing_connection>
+	template <typename tag>
 	inline void total_erasing(simple_file_descriptor::pointer fd)
 	{
 		log(BLUE << "Closing file descriptor " << *fd << RESET);
+		if (init_flags.find(*fd) == init_flags.end())
+		{
+			return;
+		}
+		
 		int fl = init_flags.at(*fd);
 		flags.erase(*fd);
 		init_flags.erase(*fd);
@@ -302,7 +337,14 @@ struct everything_executor
 		if (tag::need_to_erase_from_timer && (fl & timer_flag))
 		{
 			my_timer.erase(fd, times.at(*fd));
+		}
+		if (fl & timer_flag)
+		{
 			times.erase(*fd);
+		}
+		if (fl & closable_flag)
+		{
+			closer.erase(*fd);
 		}
 		descriptors.erase(*fd);
 		epoll_ctl(*epoll_fd, EPOLL_CTL_DEL, *fd, NULL);
@@ -357,16 +399,17 @@ struct everything_executor
 		return event;
 	}
 
-	inline void after_action(acceptable_type& result)
+	template <typename tag = erasing_by_closing_connection>
+	inline void after_action(std::unordered_set <int>& deleted, acceptable_type result)
 	{
+		log("Result.size = " << result.size());
 		for (auto iter: result)
 		{	
 			auto fd = iter.first;
 
 			if (init_flags.find(*fd) == init_flags.end())
 			{
-				log("Descriptor " << *fd << " doesn't exist!");
-				std::abort();
+				continue;
 			}
 			
 			int init = init_flags.at(*fd);
@@ -374,10 +417,15 @@ struct everything_executor
 			epoll_event event = change_status_of_reading_writing(fd, init, fl, iter.second);
 			
 			epoll_ctl(*epoll_fd, EPOLL_CTL_MOD, *fd, &event);
-			
+
 			if (iter.second & (descriptor_action::CLOSING_SOCKET | descriptor_action::EXECUTION_ERROR))
 			{
-				total_erasing(fd);
+				if (init & closable_flag)
+				{
+					result.splice(result.end(), closer.at(*fd)(fd));
+				}
+				total_erasing<tag>(fd);
+				deleted.insert(*fd);
 			}
 		}
 	}
@@ -392,27 +440,37 @@ struct everything_executor
 			log(RED << "Waiting with time " << time_to_wait << RESET);
 			int cnt = epoll_wait(*epoll_fd, event, max_events, time_to_wait);
 			//log(RED << "Step " << step << RESET);
+
+			std::unordered_set <int> deleted;
+			
 			if (cnt == 0)
 			{
-				total_erasing <erasing_by_timeout>(*my_timer.timeout());
+				auto fd = my_timer.timeout();
+				after_action <erasing_by_timeout> (deleted, acceptable_type({std::make_pair(fd, descriptor_action::CLOSING_SOCKET)}));
 				log(YELLOW << "Timer killed execution" << RESET);
 			}
+			
 			for (int i = 0; i < cnt; i++)
 			{
 				epoll_event current = event[i];
-				log(CYAN << "Descriptor " << current.data.fd << " -> " << (((bool)(current.events & EPOLLIN)) ? "EPOLLIN " : "") << (((bool)(current.events & EPOLLOUT)) ? "EPOLLOUT" : "") << (((bool)(current.events & EPOLLRDHUP)) ? "EPOLLRDHUP" : "") << RESET);
+				
+				log(CYAN << "Descriptor " << current.data.fd << " -> " << (((bool)(current.events & EPOLLIN)) ? "EPOLLIN " : "") << (((bool)(current.events & EPOLLOUT)) ? "EPOLLOUT " : "") << (((bool)(current.events & EPOLLRDHUP)) ? "EPOLLRDHUP " : "") << (((bool)(current.events & EPOLLHUP)) ? "EPOLLHUP " : "") << (((bool)(current.events & EPOLLERR)) ? "EPOLLERR" : "") << RESET);
 
-				if (flags.find(current.data.fd) == flags.end())
+				if (deleted.find(current.data.fd) != deleted.end())
 				{
 					continue;
 				}
 
 				int fl = flags.at(current.data.fd);
-				int init_fl = init_flags.at(current.data.fd);
+				//int init_fl = init_flags.at(current.data.fd);
 	
 				//log("But " << ((fl & acceptable_flag) ? "acceptable, " : "non acceptable, ") << ((fl & readable_flag) ? "readable, " : "non readable, ") << ((fl & acceptable_flag) ? "writable, " : "non writable, "));
-				
-				if (current.events & (EPOLLIN | EPOLLRDHUP))
+
+				if (current.events & (EPOLLRDHUP | EPOLLERR))
+				{
+					after_action(deleted, acceptable_type({std::make_pair(simple_file_descriptor::pointer(current.data.fd), descriptor_action::CLOSING_SOCKET)}));
+				}
+				if (deleted.find(current.data.fd) == deleted.end() && (current.events & EPOLLIN))
 				{
 					acceptable_type result; 
 					if (fl & signalizable_flag)
@@ -420,28 +478,28 @@ struct everything_executor
 						//log("S " << current.data.fd);
 						(*signaler)();
 					}
-					else if ((fl & readable_flag) || ((init_fl & readable_flag) && (current.events & EPOLLRDHUP)))
+					else if (fl & readable_flag)
 					{
 						//log("R " << current.data.fd);
 						result = reader.at(current.data.fd)(simple_file_descriptor::pointer(current.data.fd), current);
 					}
-					else if (fl & acceptable_flag || ((init_fl & acceptable_flag) && (current.events & EPOLLRDHUP)))
+					else if (fl & acceptable_flag)
 					{
 						//log("A " << current.data.fd);
 						result = accepter.at(current.data.fd)(simple_file_descriptor::pointer(current.data.fd), current);
 					}
-					after_action(result);
+					after_action(deleted, result);
 				}
-				if (init_flags.find(current.data.fd) != init_flags.end() && (current.events & EPOLLOUT) && (fl & writable_flag))
+				if (deleted.find(current.data.fd) == deleted.end() && (current.events & EPOLLOUT) && (fl & writable_flag))
 				{
-					log("W " << current.data.fd);
-					acceptable_type result = writer.at(current.data.fd)(simple_file_descriptor::pointer(current.data.fd), current);
-					after_action(result);
+					//log("W " << current.data.fd);
+					auto result = writer.at(current.data.fd)(simple_file_descriptor::pointer(current.data.fd), current);
+					after_action(deleted, result);
 				}
-				if (init_flags.find(current.data.fd) != init_flags.end() && (init_flags.at(current.data.fd) & auto_closable_flag))
+				if (deleted.find(current.data.fd) == deleted.end() && (fl & auto_closable_flag))
 				{
 					log("Auto-close " << current.data.fd);
-					total_erasing(current.data.fd);
+					after_action(deleted, acceptable_type({std::make_pair(simple_file_descriptor::pointer(current.data.fd), descriptor_action::CLOSING_SOCKET)}));
 				}
 			}
 		}
@@ -463,6 +521,10 @@ struct everything_executor
 		{
 			event.events |= EPOLLOUT;
 		}
+		if (fd & closable_flag)
+		{
+			event.events |= EPOLLRDHUP;
+		}
 		return event;
 	}
 	
@@ -471,6 +533,7 @@ struct everything_executor
 	std::unordered_map <int, executable_function> writer;
 	std::unordered_map <int, executable_function> reader;
 	std::unordered_map <int, executable_function> accepter;
+	std::unordered_map <int, executable_function_without_epoll_event> closer;
 	std::unordered_map <int, int> flags;
 	std::unordered_map <int, int> init_flags;
 	std::unordered_map <int, int> times;

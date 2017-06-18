@@ -24,8 +24,10 @@ struct file_descriptors
 	{
 		int pipefd[2];
 		int res = pipe(pipefd);
+		log("Created 2 pipes: " << pipefd[0] << ' ' << pipefd[1]);
 		if (res < 0)
 		{
+			//Here is a big problem!
 			throw fd_exception("Error creating pipe");
 		}
 		return std::make_pair <simple_file_descriptor::pointer, file_descriptor <notifier>> (pipefd[0], pipefd[1]);

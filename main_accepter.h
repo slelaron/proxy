@@ -15,26 +15,32 @@
 struct main_accepter
 {
 	typedef std::list <std::pair <simple_file_descriptor::pointer, int>> result_type;
-	typedef file_descriptor <non_blocking, auto_closable, acceptable <time_dependent_compile <15000>, non_blocking, readable, writable>> accept_type;
+	typedef file_descriptor <non_blocking, auto_closable, acceptable <time_dependent_compile <15000>, non_blocking, readable, writable, closable>> accept_type;
 	typedef std::map <simple_file_descriptor::pointer, std::pair <std::shared_ptr <cassette>, boost::optional <int>>> type_in_map;
 
 	main_accepter(std::shared_ptr <std::map <simple_file_descriptor::pointer, type_in_map> > map, std::shared_ptr <name_resolver> resolver, simple_file_descriptor::pointer fd):
 		fd(fd),
 		my_cassette(std::make_shared <cassette>()),
 		map(map),
-		resolver(resolver)
+		resolver(resolver),
+		last(std::make_shared <boost::optional <simple_file_descriptor::pointer>>())
 	{
 		my_cassette->set_client_socket(fd);
 	}
 	
 	std::function <std::pair <result_type, std::vector <accept_type>>(simple_file_descriptor::pointer, epoll_event)> get_accept()
 	{
-		return main_reader(fd, my_cassette, map, resolver);
+		return main_reader(fd, my_cassette, map, resolver, last);
 	}
 
 	std::function <result_type(simple_file_descriptor::pointer, epoll_event)> get_write()
 	{
 		return main_writer(my_cassette);
+	}
+
+	std::function <result_type(simple_file_descriptor::pointer)> get_close()
+	{
+		return main_closer(my_cassette, fd, map, last);
 	}
 	
 	private:
@@ -44,15 +50,17 @@ struct main_accepter
 		main_reader(simple_file_descriptor::pointer fd,
 					std::shared_ptr <cassette> my_cassette,
 					std::shared_ptr <std::map <simple_file_descriptor::pointer, type_in_map>> map,
-					std::shared_ptr <name_resolver> resolver):
+					std::shared_ptr <name_resolver> resolver,
+					std::shared_ptr <boost::optional <simple_file_descriptor::pointer>> last):
 			fd(fd),
 			my_cassette(my_cassette),
 			map(map),
-			resolver(resolver)
+			resolver(resolver),
+			last(last)
 		{}
 
-		std::pair <result_type, std::vector <accept_type>> operator()(simple_file_descriptor::pointer, epoll_event)
-		{
+		std::pair <result_type, std::vector <accept_type>> operator()(simple_file_descriptor::pointer, epoll_event event)
+		{	
 			result_type result;
 			std::vector <accept_type> accepted;
 			
@@ -66,6 +74,15 @@ struct main_accepter
 				auto the_host = my_cassette->get_client_executor().get_host();
 				if (the_host)
 				{
+					log("Host is " << *the_host);
+				}
+				else
+				{
+					log("Host hasn't been determined");
+					log(my_cassette->get_client_executor().get_info());
+				}
+				if (the_host)
+				{
 					if (*the_host != host || !my_cassette->server_still_alive())
 					{
 						log(*the_host);
@@ -76,7 +93,7 @@ struct main_accepter
 							map->insert({res.second, type_in_map()});
 						}
 						map->at(res.second).insert({fd, std::make_pair(my_cassette, my_cassette->get_client_executor().get_port())});
-						last = res.second;
+						*last = res.second;
 						
 						if (res.first == name_resolver::action::NEW)
 						{
@@ -91,23 +108,11 @@ struct main_accepter
 						//result.splice(result.begin(), my_cassette->start_server());
 					}
 				}
+
+				log("Need found");
 			}
 			return std::make_pair(result, std::move(accepted));
 		}
-
-		~main_reader()
-		{
-			if (last)
-			{
-				if (map->find(*last) != map->end())
-				{
-					map->at(*last).erase(fd);
-				}
-				
-				last.reset();
-			}
-		}
-
 		private:
 
 		simple_file_descriptor::pointer fd;
@@ -115,7 +120,7 @@ struct main_accepter
 		std::shared_ptr <std::map <simple_file_descriptor::pointer, type_in_map>> map;
 		std::shared_ptr <name_resolver> resolver;
 		std::string host;
-		boost::optional <simple_file_descriptor::pointer> last;
+		std::shared_ptr <boost::optional <simple_file_descriptor::pointer>> last;
 	};
 
 	struct main_writer
@@ -136,8 +141,44 @@ struct main_accepter
 		std::shared_ptr <cassette> my_cassette;
 	};
 
+	struct main_closer
+	{
+		main_closer(std::shared_ptr <cassette> my_cassette,
+					simple_file_descriptor::pointer fd,
+					std::shared_ptr <std::map <simple_file_descriptor::pointer, type_in_map> > map,
+					std::shared_ptr <boost::optional <simple_file_descriptor::pointer>> last):
+			my_cassette(my_cassette),
+			fd(fd),
+			map(map),
+			last(last)
+		{}
+
+		result_type operator()(simple_file_descriptor::pointer)
+		{
+			auto to_return = my_cassette->close();
+			if (*last)
+			{
+				if (map->find(**last) != map->end())
+				{
+					map->at(**last).erase(fd);
+				}	
+				last->reset();
+			}
+			my_cassette->invalidate_client();
+			return to_return;
+		}
+
+		private:
+
+		std::shared_ptr <cassette> my_cassette;
+		simple_file_descriptor::pointer fd;
+		std::shared_ptr <std::map <simple_file_descriptor::pointer, type_in_map>> map;
+		std::shared_ptr <boost::optional <simple_file_descriptor::pointer>> last;
+	};
+
 	simple_file_descriptor::pointer fd;
 	std::shared_ptr <cassette> my_cassette;
-	std::shared_ptr <std::map <simple_file_descriptor::pointer, type_in_map> > map;
+	std::shared_ptr <std::map <simple_file_descriptor::pointer, type_in_map>> map;
 	std::shared_ptr <name_resolver> resolver;
+	std::shared_ptr <boost::optional <simple_file_descriptor::pointer>> last;
 };

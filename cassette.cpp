@@ -68,7 +68,7 @@ cassette::result_type cassette::read(boost::optional <simple_file_descriptor::po
 	{
 		log(from_name << " read");
 		int res = from_io.read(**from);
-		if (res & descriptor_action::CLOSING_SOCKET)
+		if (res & (descriptor_action::CLOSING_SOCKET | descriptor_action::EXECUTION_ERROR))
 		{
 			from_ret |= descriptor_action::CLOSING_SOCKET;
 			to_ret |= descriptor_action::CLOSING_SOCKET;

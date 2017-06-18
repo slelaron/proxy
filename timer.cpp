@@ -1,67 +1,75 @@
 #include "timer.h"
 #include "log.h"
 #include "fd_exception.h"
-#include <set>
-#include <map>
+
+#include <chrono>
+#include <ratio>
+
+std::chrono::high_resolution_clock::time_point timer::begin_time = std::chrono::high_resolution_clock::now();
 
 timer::timer()
 {}
 
-void timer::add(simple_file_descriptor::pointer fd, int time)
+timer::internal timer::add(simple_file_descriptor::pointer fd, int time)
 {
-	int current_time = time + 1000 * clock() / CLOCKS_PER_SEC;
-	if (descriptors.find(time) == descriptors.end() || (descriptors.find(time) != descriptors.end() && descriptors.at(time).size() == 0))
+	using namespace std::chrono;
+	
+	duration <double, std::milli> time_span = high_resolution_clock::now() - begin_time;
+	int current_time = time + time_span.count();
+	//log("Time to add:" << (int)time_span.count());
+	if (descriptors.find(time) == descriptors.end() || (descriptors.find(time) != descriptors.end() && descriptors.at(time).empty()))
 	{
 		times.insert({current_time, time});
 	}
-	descriptors[time].insert({*fd, current_time});
+	descriptors[time].push_back(std::make_pair(fd, current_time));
+	auto iter = descriptors[time].end();
+	return internal(--iter, time);
 }
 
-void timer::erase(simple_file_descriptor::pointer fd, int time)
+void timer::erase(internal to_erase)
 {
+	int time = to_erase.time;
+	auto iter = to_erase.iter;
 	if (descriptors.find(time) != descriptors.end())
 	{
 		auto& container = descriptors[time];
-		auto object = container.upper_bound(std::make_pair(*fd, -1));
-		if (object->first == *fd)
+		if (iter == container.begin())
 		{
-			times.erase(std::make_pair(object->second, time));
-			container.erase(object);
-			if (container.size() > 0)
+			times.erase(std::make_pair(iter->second, time));
+			container.erase(iter);
+			if (!container.empty())
 			{
-				times.insert({container.begin()->second, time});
+				times.insert(std::make_pair(container.begin()->second, time));
 			}
 		}
 		else
 		{
-			throw fd_exception("May be it is bug. You try to delete element, that doesn't exist ", *fd);
+			container.erase(iter);
 		}
 	}
 	else
 	{
-		throw fd_exception("Wrong searching in times ", *fd);
+		std::abort();
 	}
 }
 
-simple_file_descriptor::pointer timer::timeout()
+timer::internal timer::update(internal to_update)
 {
-	int time = times.begin()->second;
-	times.erase(times.begin());
-	auto& to_update = descriptors[time];
-	simple_file_descriptor::pointer to_return = to_update.begin()->first;
-	to_update.erase(to_update.begin());
-	if (to_update.size() > 0)
-	{
-		times.insert({to_update.begin()->second, time});
-	}
-	return to_return;
+	int time = to_update.time;
+	auto fd = to_update.iter->first;
+	erase(to_update);
+	return add(fd, time);
 }
 
-int timer::get_time()
+std::pair <int, boost::optional <simple_file_descriptor::pointer>> timer::get_time()
 {
+	using namespace std::chrono;
+	
 	if (times.empty())
 	{
-		return -1;
+		return std::make_pair(-1, boost::none);
 	}
-	return std::max(times.begin()->first - (int)(1000 * clock() / CLOCKS_PER_SEC), 0);
+	duration <double, std::milli> time_span = high_resolution_clock::now() - begin_time;
+	//log("Time to del: " << (int)time_span.count());
+	return std::make_pair(std::max(times.begin()->first - (int)time_span.count(), 0), boost::make_optional(descriptors[times.begin()->second].begin()->first));
 }

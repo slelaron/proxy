@@ -39,7 +39,9 @@ int http_executor::read(simple_file_descriptor::pointer smpl)
 			if (host_pos == std::string::npos || host_end == std::string::npos ||
 				(length_pos != std::string::npos && length_end == std::string::npos))
 			{
-				throw fd_exception("Wrong http-request, very strange: " + header);
+				//Do something with it!
+				//throw fd_exception("Wrong http-request, very strange: " + header);
+				return descriptor_action::EXECUTION_ERROR;
 			}
 
 			std::string prehost = header.substr(host_pos + host_id.size(), host_end - host_pos - host_id.size());

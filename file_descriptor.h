@@ -242,14 +242,9 @@ struct everything_executor
 	typename std::enable_if <contains_convertible_in_args <time_dependent, Args...>::value == 1, void>::type
 	update_timer(int& fl, int& init_fl, const file_descriptor <Args...>& fd)
 	{
-		if (fd.get_time() > 0)
-		{
-			//log(GREEN << "Set timer" << RESET);
-			my_timer.add(fd.get_pointer(), fd.get_time());
-		}
 		fl |= timer_flag;
 		init_fl |= timer_flag;
-		times.insert({*fd, fd.get_time()});
+		times.insert({*fd, my_timer.add(fd.get_pointer(), fd.get_time())});
 	}
 
 	template <typename... Args>
@@ -300,17 +295,6 @@ struct everything_executor
 		return 0;
 	}
 
-	struct erasing_by_closing_connection
-	{
-		static const bool need_to_erase_from_timer = true;
-	};
-
-	struct erasing_by_timeout
-	{
-		static const bool need_to_erase_from_timer = false;
-	};
-
-	template <typename tag>
 	inline void total_erasing(simple_file_descriptor::pointer fd)
 	{
 		log(BLUE << "Closing file descriptor " << *fd << RESET);
@@ -334,9 +318,9 @@ struct everything_executor
 		{
 			accepter.erase(*fd);
 		}
-		if (tag::need_to_erase_from_timer && (fl & timer_flag))
+		if (fl & timer_flag)
 		{
-			my_timer.erase(fd, times.at(*fd));
+			my_timer.erase(times.at(*fd));
 		}
 		if (fl & timer_flag)
 		{
@@ -399,7 +383,6 @@ struct everything_executor
 		return event;
 	}
 
-	template <typename tag = erasing_by_closing_connection>
 	inline void after_action(std::unordered_set <int>& deleted, acceptable_type result)
 	{
 		log("Result.size = " << result.size());
@@ -424,7 +407,7 @@ struct everything_executor
 				{
 					result.splice(result.end(), closer.at(*fd)(fd));
 				}
-				total_erasing<tag>(fd);
+				total_erasing(fd);
 				deleted.insert(*fd);
 			}
 		}
@@ -436,17 +419,16 @@ struct everything_executor
 		for (int step = 0; ; step++)
 		{
 			log("Step " << step);
-			int time_to_wait = my_timer.get_time();
-			log(RED << "Waiting with time " << time_to_wait << RESET);
-			int cnt = epoll_wait(*epoll_fd, event, max_events, time_to_wait);
+			auto time_to_wait = my_timer.get_time();
+			log(RED << "Waiting with time " << time_to_wait.first << RESET);
+			int cnt = epoll_wait(*epoll_fd, event, max_events, time_to_wait.first);
 			//log(RED << "Step " << step << RESET);
 
 			std::unordered_set <int> deleted;
 			
 			if (cnt == 0)
-			{
-				auto fd = my_timer.timeout();
-				after_action <erasing_by_timeout> (deleted, acceptable_type({std::make_pair(fd, descriptor_action::CLOSING_SOCKET)}));
+			{	
+				after_action(deleted, acceptable_type({std::make_pair(*time_to_wait.second, descriptor_action::CLOSING_SOCKET)}));
 				log(YELLOW << "Timer killed execution" << RESET);
 			}
 			
@@ -462,6 +444,11 @@ struct everything_executor
 				}
 
 				int fl = flags.at(current.data.fd);
+
+				if (fl & timer_flag)
+				{
+					times.at(current.data.fd) = my_timer.update(times.at(current.data.fd));
+				}
 				//int init_fl = init_flags.at(current.data.fd);
 	
 				//log("But " << ((fl & acceptable_flag) ? "acceptable, " : "non acceptable, ") << ((fl & readable_flag) ? "readable, " : "non readable, ") << ((fl & acceptable_flag) ? "writable, " : "non writable, "));
@@ -536,7 +523,7 @@ struct everything_executor
 	std::unordered_map <int, executable_function_without_epoll_event> closer;
 	std::unordered_map <int, int> flags;
 	std::unordered_map <int, int> init_flags;
-	std::unordered_map <int, int> times;
+	std::unordered_map <int, timer::internal> times;
 	const file_descriptor<> epoll_fd;
 	boost::optional <std::function <void()>> signaler;
 };

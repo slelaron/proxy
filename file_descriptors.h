@@ -28,13 +28,20 @@ struct file_descriptors
 		if (res < 0)
 		{
 			//Here is a big problem!
+			//Not now. I catch this exception.
 			throw fd_exception("Error creating pipe");
 		}
 		return std::make_pair <simple_file_descriptor::pointer, file_descriptor <notifier>> (pipefd[0], pipefd[1]);
 	}
 
-	static void awaken_read(simple_file_descriptor::pointer who, epoll_event event)
+	static bool is_correct_connection(simple_file_descriptor::pointer check)
 	{
-		
+		int error = 0;
+		socklen_t len = sizeof(error);
+		if (getsockopt(*check, SOL_SOCKET, SO_ERROR, &error, &len) < 0)
+		{
+			return false;
+		}
+		return (error == 0);
 	}
 };

@@ -15,7 +15,7 @@
 struct main_accepter
 {
 	typedef std::list <std::pair <simple_file_descriptor::pointer, int>> result_type;
-	typedef file_descriptor <non_blocking, auto_closable, acceptable <time_dependent_compile <15000>, non_blocking, readable, writable, closable>> accept_type;
+	typedef file_descriptor <non_blocking, auto_closable, acceptable <time_dependent_compile <45000>, non_blocking, readable, writable, closable>> accept_type;
 	typedef std::map <simple_file_descriptor::pointer, std::pair <std::shared_ptr <cassette>, boost::optional <int>>> type_in_map;
 
 	main_accepter(std::shared_ptr <std::map <simple_file_descriptor::pointer, type_in_map> > map, std::shared_ptr <name_resolver> resolver, simple_file_descriptor::pointer fd):
@@ -75,38 +75,38 @@ struct main_accepter
 				if (the_host)
 				{
 					log("Host is " << *the_host);
-				}
-				else
-				{
-					log("Host hasn't been determined");
-					log(my_cassette->get_client_executor().get_info());
-				}
-				if (the_host)
-				{
 					if (*the_host != host || !my_cassette->server_still_alive())
 					{
 						log(*the_host);
 						host = *the_host;
-						auto res = resolver->resolve(host);
-						if (res.first == name_resolver::action::NEW && map->find(res.second) == map->end())
-						{
-							map->insert({res.second, type_in_map()});
-						}
-						map->at(res.second).insert({fd, std::make_pair(my_cassette, my_cassette->get_client_executor().get_port())});
-						*last = res.second;
 						
-						if (res.first == name_resolver::action::NEW)
+						try
 						{
-							accept_type accepted_fd(*res.second);
-							pipe_accepter my_pipe(map, resolver);
-							accepted_fd.set_accept(my_pipe.get_accept());
-							accepted.push_back(std::move(accepted_fd));
+							auto res = resolver->resolve(host);
+							if (res.first == name_resolver::action::NEW && map->find(res.second) == map->end())
+							{
+								map->insert({res.second, type_in_map()});
+							}
+							map->at(res.second).insert({fd, std::make_pair(my_cassette, my_cassette->get_client_executor().get_port())});
+							*last = res.second;
+							
+							if (res.first == name_resolver::action::NEW)
+							{
+								accept_type accepted_fd(*res.second);
+								pipe_accepter my_pipe(map, resolver);
+								accepted_fd.set_accept(my_pipe.get_accept());
+								accepted.push_back(std::move(accepted_fd));
+							}
+						}
+						catch (...)
+						{
+							result.push_back({fd, descriptor_action::CLOSING_SOCKET});
 						}
 					}
-					else
-					{
-						//result.splice(result.begin(), my_cassette->start_server());
-					}
+				}
+				else if (my_cassette->get_client_executor().get_length() >= (int)my_cassette->get_client_executor().BUFFER_SIZE || my_cassette->get_client_executor().is_header_full())
+				{						
+					result.push_back({fd, descriptor_action::CLOSING_SOCKET});
 				}
 
 				log("Need found");

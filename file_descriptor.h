@@ -95,11 +95,11 @@ struct socket_descriptor: virtual simple_file_descriptor,
 			int result = accept(event.data.fd, (sockaddr*)&addr, &len);
 			if (result == -1)
 			{
+				//Correct this fucking sheet!
 				throw fd_exception(std::string("Error accepting file descriptor: ") + strerror(errno), event.data.fd);
 			}
 			log("Accepting new socket " << result);
 			std::vector <first_accessable> vt;
-			//first_accessable accepted = result;
 			vt.emplace_back(result);
 			type_to_accept_functions::template set<0>(vt[0], funcs(simple_file_descriptor::pointer(result)));
 			return std::move(std::make_pair(std::list <std::pair <simple_file_descriptor::pointer, int>>(), std::move(vt)));
@@ -157,15 +157,12 @@ struct everything_executor
 	template <typename... Args>
 	typename std::enable_if <contains_convertible_in_args <signalizable_tag, Args...>::value < 1, void>::type
 	set_signal(int& fl, int& init_fl, const file_descriptor <Args...>& fd)
-	{
-		//log("Miss signal " << *fd);
-	}
+	{}
 
 	template <typename... Args>
 	typename std::enable_if <contains_convertible_in_args <signalizable_tag, Args...>::value == 1, void>::type
 	set_signal(int& fl, int& init_fl, const file_descriptor <Args...>& fd)
 	{
-		//log("Set signal " << *fd);
 		signaler = boost::make_optional <std::function <void()>>(fd.get_signal());
 		init_fl |= signalizable_flag;
 		if (!contains_in_args <initially_not_signalize, Args...>::value)
@@ -175,16 +172,7 @@ struct everything_executor
 	template <int flag, typename T, typename E, typename... Args>
 	typename std::enable_if <contains_convertible_in_args <T, Args...>::value < 1, void>::type
 	set_function(std::unordered_map <int, executable_function>& storage, int& fl, int& init_fl, const file_descriptor <Args...>& fd)
-	{
-		//if (flag == writable_flag)
-		//{
-			//log(GREEN << "Miss write " << *fd << RESET);
-		//}
-		//else
-		//{
-			//log(GREEN << "Miss read " << *fd << RESET);
-		//}
-	}
+	{}
 
 	template <int flag, typename T, typename E, typename... Args>
 	typename std::enable_if <contains_convertible_in_args <T, Args...>::value == 1, void>::type
@@ -193,12 +181,10 @@ struct everything_executor
 		storage.insert({*fd, static_cast <const E&>(fd).get_func()});
 		if (flag == readable_flag && !contains_in_args <initially_not_read, Args...>::value)
 		{
-			//log("Set read " << *fd);
 			fl |= flag;
 		}
 		else if (flag == writable_flag && !contains_in_args <initially_not_write, Args...>::value)
 		{
-			//log("Set write " << *fd);
 			fl |= flag;
 		}
 		init_fl |= flag;
@@ -207,15 +193,12 @@ struct everything_executor
 	template <typename... Args>
 	typename std::enable_if <contains_convertible_in_args <acceptable_tag, Args...>::value < 1, void>::type
 	set_accept(int& fl, int& init_fl, const file_descriptor <Args...>& fd)
-	{
-		//log(GREEN << "Miss accept " << *fd << RESET);
-	}
+	{}
 
 	template <typename... Args>
 	typename std::enable_if <contains_convertible_in_args <acceptable_tag, Args...>::value == 1, void>::type
 	set_accept(int& fl, int& init_fl, const file_descriptor <Args...>& fd)
 	{
-		//log("Set accept " << *fd);
 		executable_function func = [this, func = fd.get_accept()](simple_file_descriptor::pointer ptr, epoll_event event)
 		{
 			auto vt = func(ptr, event);
@@ -234,9 +217,7 @@ struct everything_executor
 	template <typename... Args>
 	typename std::enable_if <contains_convertible_in_args <time_dependent, Args...>::value < 1, void>::type
 	update_timer(int& fl, int& init_fl, const file_descriptor <Args...>& fd)
-	{
-		//log(GREEN << "Miss timer " << *fd << RESET);
-	}
+	{}
 
 	template <typename... Args>
 	typename std::enable_if <contains_convertible_in_args <time_dependent, Args...>::value == 1, void>::type
@@ -334,51 +315,29 @@ struct everything_executor
 		epoll_ctl(*epoll_fd, EPOLL_CTL_DEL, *fd, NULL);
 	}
 
+	inline void change_status(int epoll_flag, int flag, int& fl, epoll_event& event, int init, int res, int stop, int start)
+	{
+		if (init & flag)
+		{
+			if (res & stop)
+			{
+				event.events &= ~epoll_flag;
+				fl &= ~flag;
+			}
+			else if (res & start)
+			{
+				event.events |= epoll_flag;
+				fl |= flag;
+			}
+		}
+	}
+
 	inline epoll_event change_status_of_reading_writing(simple_file_descriptor::pointer fd, int init, int& fl, int res)
 	{
 		epoll_event event = set_epoll_flags(*fd, fl);
-		//log(CYAN << *fd << " was -> " << (((bool)(event.events & EPOLLIN)) ? "In" : "") << ' ' << (((bool)(event.events & EPOLLOUT)) ? "Out" : "") << RESET);
-		if (init & readable_flag)
-		{
-			if (res & STOP_READING)
-			{
-				event.events &= ~EPOLLIN;
-				fl &= ~readable_flag;
-			}
-			else if (res & START_READING)
-			{
-				event.events |= EPOLLIN;
-				fl |= readable_flag;
-			}
-		}
-
-		if (init & acceptable_flag)
-		{
-			if (res & STOP_READING)
-			{
-				event.events &= ~EPOLLIN;
-				fl &= ~acceptable_flag;
-			}
-			else if (res & START_READING)
-			{
-				event.events |= EPOLLIN;
-				fl |= acceptable_flag;
-			}
-		}
-
-		if (init & writable_flag)
-		{
-			if (res & STOP_WRITING)
-			{
-				event.events &= ~EPOLLOUT;
-				fl &= ~writable_flag;
-			}
-			else if (res & START_WRITING)
-			{
-				event.events |= EPOLLOUT;
-				fl |= writable_flag;
-			}
-		}
+		change_status(EPOLLIN, readable_flag, fl, event, init, res, STOP_READING, START_READING);
+		change_status(EPOLLIN, acceptable_flag, fl, event, init, res, STOP_READING, START_READING);
+		change_status(EPOLLOUT, writable_flag, fl, event, init, res, STOP_WRITING, START_WRITING);
 		log(CYAN << *fd << " transformed to " << (((bool)(event.events & EPOLLIN)) ? "In" : "") << ' ' << (((bool)(event.events & EPOLLOUT)) ? "Out" : "") << RESET);
 		return event;
 	}
@@ -422,7 +381,6 @@ struct everything_executor
 			auto time_to_wait = my_timer.get_time();
 			log(RED << "Waiting with time " << time_to_wait.first << RESET);
 			int cnt = epoll_wait(*epoll_fd, event, max_events, time_to_wait.first);
-			//log(RED << "Step " << step << RESET);
 
 			std::unordered_set <int> deleted;
 			
@@ -449,10 +407,7 @@ struct everything_executor
 				{
 					times.at(current.data.fd) = my_timer.update(times.at(current.data.fd));
 				}
-				//int init_fl = init_flags.at(current.data.fd);
-	
-				//log("But " << ((fl & acceptable_flag) ? "acceptable, " : "non acceptable, ") << ((fl & readable_flag) ? "readable, " : "non readable, ") << ((fl & acceptable_flag) ? "writable, " : "non writable, "));
-
+				
 				if (current.events & (EPOLLRDHUP | EPOLLERR))
 				{
 					after_action(deleted, acceptable_type({std::make_pair(simple_file_descriptor::pointer(current.data.fd), descriptor_action::CLOSING_SOCKET)}));
@@ -462,24 +417,20 @@ struct everything_executor
 					acceptable_type result; 
 					if (fl & signalizable_flag)
 					{
-						//log("S " << current.data.fd);
 						(*signaler)();
 					}
 					else if (fl & readable_flag)
 					{
-						//log("R " << current.data.fd);
 						result = reader.at(current.data.fd)(simple_file_descriptor::pointer(current.data.fd), current);
 					}
 					else if (fl & acceptable_flag)
 					{
-						//log("A " << current.data.fd);
 						result = accepter.at(current.data.fd)(simple_file_descriptor::pointer(current.data.fd), current);
 					}
 					after_action(deleted, result);
 				}
 				if (deleted.find(current.data.fd) == deleted.end() && (current.events & EPOLLOUT) && (fl & writable_flag))
 				{
-					//log("W " << current.data.fd);
 					auto result = writer.at(current.data.fd)(simple_file_descriptor::pointer(current.data.fd), current);
 					after_action(deleted, result);
 				}
@@ -499,7 +450,6 @@ struct everything_executor
 		epoll_event event;
 		event.data.fd = fd;
 		event.events = initial_flags;
-		//event.events |= EPOLLET;
 		if (fl & (readable_flag | acceptable_flag | signalizable_flag))
 		{
 			event.events |= EPOLLIN;

@@ -20,7 +20,7 @@
 int main()
 {
 	//freopen("output", "w", stdout);
-	socket_descriptor <non_blocking, acceptable <time_dependent_compile <10000>, non_blocking, writable, closable, acceptable <non_blocking, auto_closable, acceptable <time_dependent_compile <15000>, non_blocking, readable, writable, closable>>>> needed_fd;
+	socket_descriptor <non_blocking, acceptable <time_dependent_compile <30000>, non_blocking, writable, closable, acceptable <non_blocking, auto_closable, acceptable <time_dependent_compile <45000>, non_blocking, readable, writable, closable>>>> needed_fd;
 	everything_executor executor;
 
 	typedef std::map <simple_file_descriptor::pointer, std::pair <std::shared_ptr <cassette>, boost::optional <int>>> type_in_mp;

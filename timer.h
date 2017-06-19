@@ -10,42 +10,17 @@
 
 struct clever;
 
-template <typename T, typename P>
-struct reverse_pair_compair
-{
-	bool operator()(const std::pair <T, P> fst, const std::pair <T, P> snd)
-	{
-		return !(fst < snd);
-	}
-};
-
 struct timer
 {
 	struct internal
 	{
 		friend timer;
 
-		internal(internal&& another):
-			iter(another.iter),
-			time(another.time)
-		{}
+		internal(internal&& another) = default;
+		internal(const internal& another) = default;
 
-		internal(const internal& another):
-			iter(another.iter),
-			time(another.time)
-		{}
-
-		void operator=(const internal& another)
-		{
-			time = another.time;
-			iter = another.iter;
-		}
-
-		void operator=(internal&& another)
-		{
-			time = another.time;
-			iter = another.iter;
-		}
+		void operator=(const internal& another);
+		void operator=(internal&& another);
 		
 		private:
 
@@ -57,13 +32,7 @@ struct timer
 		int time;
 	};
 	
-	static const int TIME_TO_BREAK = 5000;
-	
-	timer();
-
 	std::pair <int, boost::optional <simple_file_descriptor::pointer>> get_time();
-
-	// TODO: EVERYTHING HERE IS BAD! CHECK AND CORRECT!!!
 
 	internal add(simple_file_descriptor::pointer fd, int time);
 	void erase(internal);

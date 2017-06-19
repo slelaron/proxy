@@ -5,10 +5,20 @@
 #include <chrono>
 #include <ratio>
 
-std::chrono::high_resolution_clock::time_point timer::begin_time = std::chrono::high_resolution_clock::now();
+void timer::internal::operator=(const internal& another)
+{
+	time = another.time;
+	iter = another.iter;
+}
 
-timer::timer()
-{}
+void timer::internal::operator=(internal&& another)
+{
+	time = another.time;
+	iter = another.iter;
+}
+
+
+std::chrono::high_resolution_clock::time_point timer::begin_time = std::chrono::high_resolution_clock::now();
 
 timer::internal timer::add(simple_file_descriptor::pointer fd, int time)
 {

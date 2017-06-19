@@ -166,12 +166,12 @@ boost::optional <int> http_executor::get_length() const
 	return length;
 }
 
-bool http_executor::is_header_full()
+bool http_executor::is_header_full() const
 {
 	return end_of_header;
 }
 
-std::string http_executor::get_header()
+std::string http_executor::get_header() const
 {
 	return header;
 }

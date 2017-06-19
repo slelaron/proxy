@@ -14,8 +14,8 @@ struct http_executor: io_executor
 
 	bool status();
 	void reset();
-	bool is_header_full();
-	std::string get_header();
+	bool is_header_full() const;
+	std::string get_header() const;
 
 	boost::optional <std::string> get_host() const;
 	boost::optional <int> get_port() const;

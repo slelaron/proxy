@@ -46,7 +46,7 @@ name_resolver::applier::applier(addrinfo* result):
 
 boost::optional <simple_file_descriptor::pointer> name_resolver::applier::operator()(boost::optional <int> port)
 {
-	addrinfo* res;
+	addrinfo* res = NULL;
 		
 	int sfd;
 	for (res = result; res != NULL; res = res->ai_next)
@@ -55,6 +55,12 @@ boost::optional <simple_file_descriptor::pointer> name_resolver::applier::operat
 
 		if (sfd == -1)
 			continue;
+
+		//You must use nonblocking file descriptor and after connecting you must check complition calling getsockopt!
+		//It is a big error here! Use EINPROGRESS!
+
+		int flags = fcntl(sfd, F_GETFL, 0);
+		fcntl(sfd, F_SETFL, flags | O_NONBLOCK);
 
 		sockaddr_in addr;
 		memset(&addr, 0, sizeof(sockaddr_in));
@@ -70,7 +76,8 @@ boost::optional <simple_file_descriptor::pointer> name_resolver::applier::operat
 			addr.sin_port = htons(*port);
 		}
 
-		if (connect(sfd, reinterpret_cast <sockaddr*>(&addr), sizeof(addr)) != -1)
+		int errors = connect(sfd, reinterpret_cast <sockaddr*>(&addr), sizeof(addr));
+		if (errors != -1 || (errors == -1 && errno == EINPROGRESS))
 			break;
 
 		close(sfd);

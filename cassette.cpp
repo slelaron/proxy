@@ -70,8 +70,8 @@ cassette::result_type cassette::read(boost::optional <simple_file_descriptor::po
 		int res = from_io.read(**from);
 		if (res & (descriptor_action::CLOSING_SOCKET | descriptor_action::EXECUTION_ERROR))
 		{
-			from_ret |= descriptor_action::CLOSING_SOCKET;
-			to_ret |= descriptor_action::CLOSING_SOCKET;
+			from_ret |= res;
+			to_ret |= res;
 		}
 		log("Delivery size " << from_io.delivery.size());
 		from_ret |= (from_io.delivery.size() < from_io.BUFFER_SIZE) ? descriptor_action::START_READING : descriptor_action::STOP_READING;
@@ -136,7 +136,12 @@ cassette::result_type cassette::write(boost::optional <simple_file_descriptor::p
 	if (from)
 	{
 		log(from_name << " write");
-		to_io.write(**from);
+		int res = to_io.write(**from);
+		if (res & (descriptor_action::CLOSING_SOCKET | descriptor_action::EXECUTION_ERROR))
+		{
+			from_ret |= res;
+			to_ret |= res;
+		}
 		log("Delivery size " << to_io.delivery.size());
 		to_ret |= (to_io.delivery.size() < to_io.BUFFER_SIZE) ? descriptor_action::START_READING : descriptor_action::STOP_READING;
 		from_ret |= (to_io.delivery.size() > 0) ? descriptor_action::START_WRITING : descriptor_action::STOP_WRITING;

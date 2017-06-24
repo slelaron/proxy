@@ -164,7 +164,7 @@ struct main_accepter
 				}	
 				last->reset();
 			}
-			my_cassette->invalidate_client();
+			//my_cassette->invalidate_client();
 			return to_return;
 		}
 

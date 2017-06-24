@@ -4,9 +4,15 @@
 #include <boost/optional.hpp>
 #include <functional>
 #include <fcntl.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/epoll.h>
+#include <sys/signalfd.h>
 
 #include "log.h"
 #include "cassette.h"
+#include "fd_exception.h"
 
 template <typename T, unsigned item = 0>
 struct from_container_erasable

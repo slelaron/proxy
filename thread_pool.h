@@ -1,6 +1,7 @@
 #pragma once
 
 #include "file_descriptor.h"
+#include "wrappers.h"
 
 #include <thread>
 #include <functional>

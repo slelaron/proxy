@@ -1,3 +1,5 @@
+#include <cstring>
+
 #include "name_resolver.h"
 #include "file_descriptors.h"
 #include "file_descriptor.h"

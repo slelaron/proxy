@@ -1,3 +1,4 @@
+#include "log.h"
 #include "cassette.h"
 
 cassette::result_type cassette::set_socket(simple_file_descriptor::pointer sock, boost::optional <simple_file_descriptor::pointer>& fd, int& flags)
@@ -84,10 +85,6 @@ cassette::result_type cassette::read(boost::optional <simple_file_descriptor::po
 			{
 				obj.push_back({*to, to_ret});
 				log(to_name << ' ' << **to << ' ' << ((to_ret & START_READING) ? "START_READING " : "") << ((to_ret & STOP_READING) ? "STOP_READING " : "") << ((to_ret & START_WRITING) ? "START_WRITING " : "") << ((to_ret & STOP_WRITING) ? "STOP_WRITING " : "") << ((to_ret & CLOSING_SOCKET) ? "CLOSING_SOCKET " : ""));
-				if (to_ret & descriptor_action::CLOSING_SOCKET)
-				{
-					to.reset();
-				}
 			}
 		}
 		if (from)
@@ -97,10 +94,6 @@ cassette::result_type cassette::read(boost::optional <simple_file_descriptor::po
 			{
 				obj.push_back({*from, from_ret});
 				log(from_name << ' ' << **from << ' ' << ((from_ret & START_READING) ? "START_READING " : "") << ((from_ret & STOP_READING) ? "STOP_READING " : "") << ((from_ret & START_WRITING) ? "START_WRITING " : "") << ((from_ret & STOP_WRITING) ? "STOP_WRITING " : "") << ((from_ret & CLOSING_SOCKET) ? "CLOSING_SOCKET " : ""));
-				if (from_ret & descriptor_action::CLOSING_SOCKET)
-				{
-					from.reset();
-				}
 			}
 		}
 	}
@@ -200,13 +193,35 @@ void cassette::invalidate_client()
 cassette::result_type cassette::close()
 {
 	result_type obj;
+	log("Buffers sizes: out " << out.delivery.size() << " in " << in.delivery.size() << ", alive: client " << static_cast <bool> (client) << " server " << static_cast <bool> (server));
 	if (client)
 	{
+		if (out.delivery.size() > 0)
+		{
+			log("UPWRITING CLIENT");
+			out.write(*client);
+		}
+		else
+		{
+			log("NOUPWRITING CLIENT");
+		}
+
+		
 		obj.push_back({*client, descriptor_action::CLOSING_SOCKET});
 	}
 	
 	if (server)
 	{
+		if (in.delivery.size() > 0)
+		{
+			log("UPWRITING SERVER");
+			in.write(*server);
+		}
+		else
+		{
+			log("NOUPWRITING SERVER");
+		}
+		
 		obj.push_back({*server, descriptor_action::CLOSING_SOCKET});
 	}
 	return obj;

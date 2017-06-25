@@ -1,4 +1,4 @@
-#include "io_executor.h"
+ #include "io_executor.h"
 #include "log.h"
 #include <unistd.h>
 #include <string.h>
@@ -16,7 +16,7 @@ io_executor::io_executor(io_executor&& another)
 
 int io_executor::read(simple_file_descriptor::pointer fd)
 {
-	log("Read from " << *fd);
+	log("Read from " << *fd << " with delivery " << delivery.size());
 	//log("Read " << delivery.size() << ' ' << start);
 	bool initial_emptiness = (delivery.size() == 0);
 	
@@ -64,12 +64,14 @@ int io_executor::read(simple_file_descriptor::pointer fd)
 		flags |= descriptor_action::STOP_READING;
 	}
 
+	//log("Text: " << delivery);
+
 	return flags;
 }	
 
 int io_executor::write(simple_file_descriptor::pointer fd)
 {
-	log("Write from " << *fd);
+	log("Write from " << *fd << " with delivery " << delivery.size());
 	//log("Write " << delivery.size() << ' ' << start);
 	//bool initial_overflow = (delivery.size() - start >= BUFFER_SIZE);
 	if (delivery.size() == 0)

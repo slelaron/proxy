@@ -1,6 +1,7 @@
 #include "http_executor.h"
 #include "fd_exception.h"
 #include "log.h"
+#include <sstream>
 #include <string>
 
 const static std::string host_id = "Host: ";
@@ -76,6 +77,33 @@ int http_executor::read(simple_file_descriptor::pointer smpl)
 	return result;
 }
 
+int http_executor::write(simple_file_descriptor::pointer smpl)
+{
+	if (end_of_header)
+	{
+		if (host)
+		{
+			std::stringstream ss;
+			ss << "http://";
+			ss << *host;
+			if (port)
+			{
+				ss << ':';
+				ss << *port;
+			}
+			std::string s;
+			std::getline(ss, s);
+			log("I formed: " << s);
+			size_t pos = delivery.find(s, 0);
+			if (pos != std::string::npos)
+			{
+				delivery.erase(pos, s.size());
+			}
+		}
+	}
+	return io_executor::write(smpl);
+}
+
 bool http_executor::status()
 {
 	if (length)
@@ -106,31 +134,7 @@ boost::optional <std::string> http_executor::get_host() const
 	{
 		return host;
 	}
-
-	//Need to check it carefully!!!
-	//If header isn't ready, I won't find host if it exists.
-	//Oops, I checked it. Everything is OK.
-	
-	size_t host_pos = header.find(host_id);
-	size_t host_end = header.find(eos_id, host_pos);
-	if (host_pos == std::string::npos || host_end == std::string::npos)
-	{
-		return boost::none;
-	}
-	else
-	{
-		std::string prehost = header.substr(host_pos + host_id.size(), host_end - host_pos - host_id.size());
-		size_t port_pos = prehost.find(":");
-		
-		if (port_pos != std::string::npos)
-		{
-			return boost::make_optional <std::string> (prehost.substr(0, port_pos));
-		}
-		else
-		{
-			return boost::make_optional <std::string> (prehost);
-		}
-	}
+	return boost::none;
 }
 
 boost::optional <int> http_executor::get_port() const 
@@ -139,26 +143,7 @@ boost::optional <int> http_executor::get_port() const
 	{
 		return port;
 	}
-	size_t host_pos = header.find(host_id);
-	size_t host_end = header.find(eos_id, host_pos);
-	if (host_pos == std::string::npos || host_end == std::string::npos)
-	{
-		return boost::none;
-	}
-	else
-	{
-		std::string prehost = header.substr(host_pos + host_id.size(), host_end - host_pos - host_id.size());
-		size_t port_pos = prehost.find(":");
-		
-		if (port_pos != std::string::npos)
-		{
-			return std::stoi(prehost.substr(port_pos + 1));
-		}
-		else
-		{
-			return boost::none;
-		}
-	}
+	return boost::none;
 }
 
 boost::optional <int> http_executor::get_length() const

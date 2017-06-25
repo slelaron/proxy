@@ -11,6 +11,7 @@ struct http_executor: io_executor
 	http_executor();
 	
 	virtual int read(simple_file_descriptor::pointer);
+	virtual int write(simple_file_descriptor::pointer);
 
 	bool status();
 	void reset();

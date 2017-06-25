@@ -13,7 +13,8 @@ http_executor::http_executor():
 	io_executor(),
 	end_of_header(false),
 	filled(0),
-	header("")
+	header(""),
+	is_header_start(false)
 {}
 
 int http_executor::read(simple_file_descriptor::pointer smpl)
@@ -79,7 +80,7 @@ int http_executor::read(simple_file_descriptor::pointer smpl)
 
 int http_executor::write(simple_file_descriptor::pointer smpl)
 {
-	if (end_of_header)
+	if (end_of_header && is_header_start)
 	{
 		if (host)
 		{
@@ -100,6 +101,7 @@ int http_executor::write(simple_file_descriptor::pointer smpl)
 				delivery.erase(pos, s.size());
 			}
 		}
+		is_header_start = false;
 	}
 	return io_executor::write(smpl);
 }
@@ -159,4 +161,9 @@ bool http_executor::is_header_full() const
 std::string http_executor::get_header() const
 {
 	return header;
+}
+
+void http_executor::new_steps()
+{
+	is_header_start = true;
 }

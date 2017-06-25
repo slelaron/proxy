@@ -68,6 +68,7 @@ struct main_accepter
 			
 			if (my_cassette->need_new())
 			{
+				my_cassette->get_client_executor().new_steps();
 				log("Need new ");
 				//result.splice(result.begin(), my_cassette->stop_server());
 				//result.splice(result.begin(), my_cassette->read(fd));
@@ -132,7 +133,9 @@ struct main_accepter
 		result_type operator()(simple_file_descriptor::pointer, epoll_event)
 		{
 			result_type result;
+			
 			result.splice(result.begin(), my_cassette->write_client());
+			
 			return result;
 		}
 

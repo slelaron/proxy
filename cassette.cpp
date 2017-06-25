@@ -227,12 +227,12 @@ cassette::result_type cassette::close()
 	return obj;
 }
 
-const http_executor& cassette::get_client_executor()
+http_executor& cassette::get_client_executor()
 {
 	return in;
 }
 
-const io_executor& cassette::get_server_executor()
+io_executor& cassette::get_server_executor()
 {
 	return out;
 }

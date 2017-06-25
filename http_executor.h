@@ -13,6 +13,8 @@ struct http_executor: io_executor
 	virtual int read(simple_file_descriptor::pointer);
 	virtual int write(simple_file_descriptor::pointer);
 
+	void new_steps();
+
 	bool status();
 	void reset();
 	bool is_header_full() const;
@@ -32,4 +34,5 @@ struct http_executor: io_executor
 	boost::optional <std::string> host;
 	boost::optional <int> port;
 	boost::optional <int> length;
+	bool is_header_start;
 };

@@ -24,8 +24,8 @@ struct cassette
 	result_type read_server();
 	result_type write_server();
 
-	const http_executor& get_client_executor();
-	const io_executor& get_server_executor();
+	http_executor& get_client_executor();
+	io_executor& get_server_executor();
 
 	bool can_read(simple_file_descriptor::pointer fd);
 	bool can_write(simple_file_descriptor::pointer fd);

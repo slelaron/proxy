@@ -72,7 +72,6 @@ struct main_accepter
 				//result.splice(result.begin(), my_cassette->stop_server());
 				//result.splice(result.begin(), my_cassette->read(fd));
 				auto the_host = my_cassette->get_client_executor().get_host();
-				my_cassette->get_client_executor().new_steps();
 				my_cassette->get_client_executor().reset();
 				if (the_host)
 				{

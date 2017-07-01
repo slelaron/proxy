@@ -60,6 +60,23 @@ int http_executor::read(simple_file_descriptor::pointer smpl)
 			{
 				host = prehost;
 			}
+
+			//erasing host from get
+
+			std::stringstream ss;
+			ss << "http://";
+			ss << prehost;
+
+			std::string s;
+			std::getline(ss, s);
+			log("I formed: " << s);
+			size_t pos = delivery.find(s, 0);
+			if (pos != std::string::npos)
+			{
+				delivery.erase(pos, s.size());
+			}
+
+			//end of erasing
 			
 			if (length_pos != std::string::npos)
 			{
@@ -85,29 +102,6 @@ int http_executor::read(simple_file_descriptor::pointer smpl)
 
 int http_executor::write(simple_file_descriptor::pointer smpl)
 {
-	if (end_of_header && is_header_start)
-	{
-		if (host)
-		{
-			std::stringstream ss;
-			ss << "http://";
-			ss << *host;
-			if (port)
-			{
-				ss << ':';
-				ss << *port;
-			}
-			std::string s;
-			std::getline(ss, s);
-			log("I formed: " << s);
-			size_t pos = delivery.find(s, 0);
-			if (pos != std::string::npos)
-			{
-				delivery.erase(pos, s.size());
-			}
-		}
-		is_header_start = false;
-	}
 	return io_executor::write(smpl);
 }
 
@@ -133,6 +127,7 @@ void http_executor::reset()
 	host.reset();
 	port.reset();
 	filled = 0;
+	is_header_start = true;
 }
 
 boost::optional <std::string> http_executor::get_host() const
@@ -166,9 +161,4 @@ bool http_executor::is_header_full() const
 std::string http_executor::get_header() const
 {
 	return header;
-}
-
-void http_executor::new_steps()
-{
-	is_header_start = true;
 }

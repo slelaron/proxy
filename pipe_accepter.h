@@ -64,7 +64,7 @@ struct pipe_accepter
 
 					auto close_func = [that = element.first](simple_file_descriptor::pointer)
 					{
-						return that->close();
+						return that->close_server();
 					};
 
 					accept_type accepted_fd(**next);

@@ -278,6 +278,7 @@ struct everything_executor
 
 			if (init_flags.find(*fd) == init_flags.end())
 			{
+				log("Nothing to do " << *fd);
 				continue;
 			}
 			

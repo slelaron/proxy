@@ -36,11 +36,15 @@ struct cassette
 	void invalidate_client();
 	void invalidate_server();
 
+	boost::optional <simple_file_descriptor::pointer> get_server();
+	boost::optional <simple_file_descriptor::pointer> get_client();
+
 	bool need_new();
 
 	bool server_still_alive();
 
-	result_type close();
+	result_type close_client();
+	result_type close_server();
 
 	private:
 
@@ -53,6 +57,9 @@ struct cassette
 
 	int client_flags;
 	int server_flags;
+
+	void upwrite_server();
+	void upwrite_client();
 
 	http_executor in;
 	io_executor out;

@@ -71,29 +71,40 @@ cassette::result_type cassette::read(boost::optional <simple_file_descriptor::po
 		int res = from_io.read(**from);
 		if (res & (descriptor_action::CLOSING_SOCKET | descriptor_action::EXECUTION_ERROR))
 		{
-			from_ret |= res;
-			to_ret |= res;
-		}
-		log("Delivery size " << from_io.delivery.size());
-		from_ret |= (from_io.delivery.size() < from_io.BUFFER_SIZE) ? descriptor_action::START_READING : descriptor_action::STOP_READING;
-		to_ret |= (from_io.delivery.size() > 0) ? descriptor_action::START_WRITING : descriptor_action::STOP_WRITING;
-
-		if (to)
-		{
-			to_ret = get_flags(to_flags, to_ret);
-			if (to_ret)
+			from_ret |= res & (descriptor_action::CLOSING_SOCKET | descriptor_action::EXECUTION_ERROR);
+			to_ret |= res & (descriptor_action::CLOSING_SOCKET | descriptor_action::EXECUTION_ERROR);
+			if (to)
 			{
 				obj.push_back({*to, to_ret});
-				log(to_name << ' ' << **to << ' ' << ((to_ret & START_READING) ? "START_READING " : "") << ((to_ret & STOP_READING) ? "STOP_READING " : "") << ((to_ret & START_WRITING) ? "START_WRITING " : "") << ((to_ret & STOP_WRITING) ? "STOP_WRITING " : "") << ((to_ret & CLOSING_SOCKET) ? "CLOSING_SOCKET " : ""));
 			}
-		}
-		if (from)
-		{
-			from_ret = get_flags(from_flags, from_ret);
-			if (from_ret)
+			if (from)
 			{
 				obj.push_back({*from, from_ret});
-				log(from_name << ' ' << **from << ' ' << ((from_ret & START_READING) ? "START_READING " : "") << ((from_ret & STOP_READING) ? "STOP_READING " : "") << ((from_ret & START_WRITING) ? "START_WRITING " : "") << ((from_ret & STOP_WRITING) ? "STOP_WRITING " : "") << ((from_ret & CLOSING_SOCKET) ? "CLOSING_SOCKET " : ""));
+			}
+		}
+		else
+		{
+			log("Delivery size " << from_io.delivery.size());
+			from_ret |= (from_io.delivery.size() < from_io.BUFFER_SIZE) ? descriptor_action::START_READING : descriptor_action::STOP_READING;
+			to_ret |= (from_io.delivery.size() > 0) ? descriptor_action::START_WRITING : descriptor_action::STOP_WRITING;
+
+			if (to)
+			{
+				to_ret = get_flags(to_flags, to_ret);
+				if (to_ret)
+				{
+					obj.push_back({*to, to_ret});
+					log(to_name << ' ' << **to << ' ' << ((to_ret & START_READING) ? "START_READING " : "") << ((to_ret & STOP_READING) ? "STOP_READING " : "") << ((to_ret & START_WRITING) ? "START_WRITING " : "") << ((to_ret & STOP_WRITING) ? "STOP_WRITING " : "") << ((to_ret & CLOSING_SOCKET) ? "CLOSING_SOCKET " : ""));
+				}
+			}
+			if (from)
+			{
+				from_ret = get_flags(from_flags, from_ret);
+				if (from_ret)
+				{
+					obj.push_back({*from, from_ret});
+					log(from_name << ' ' << **from << ' ' << ((from_ret & START_READING) ? "START_READING " : "") << ((from_ret & STOP_READING) ? "STOP_READING " : "") << ((from_ret & START_WRITING) ? "START_WRITING " : "") << ((from_ret & STOP_WRITING) ? "STOP_WRITING " : "") << ((from_ret & CLOSING_SOCKET) ? "CLOSING_SOCKET " : ""));
+				}
 			}
 		}
 	}
@@ -106,6 +117,7 @@ cassette::result_type cassette::read(boost::optional <simple_file_descriptor::po
 		log(from_name << ' ' << **from << ' ' << ((from_ret & START_READING) ? "START_READING " : "") << ((from_ret & STOP_READING) ? "STOP_READING " : "") << ((from_ret & START_WRITING) ? "START_WRITING " : "") << ((from_ret & STOP_WRITING) ? "STOP_WRITING " : "") << ((from_ret & CLOSING_SOCKET) ? "CLOSING_SOCKET " : ""));
 	}
 
+	//log("In cassette result size = " << obj.size());
 	return obj;
 }
 
@@ -132,29 +144,40 @@ cassette::result_type cassette::write(boost::optional <simple_file_descriptor::p
 		int res = to_io.write(**from);
 		if (res & (descriptor_action::CLOSING_SOCKET | descriptor_action::EXECUTION_ERROR))
 		{
-			from_ret |= res;
-			to_ret |= res;
-		}
-		log("Delivery size " << to_io.delivery.size());
-		to_ret |= (to_io.delivery.size() < to_io.BUFFER_SIZE) ? descriptor_action::START_READING : descriptor_action::STOP_READING;
-		from_ret |= (to_io.delivery.size() > 0) ? descriptor_action::START_WRITING : descriptor_action::STOP_WRITING;
-
-		if (to)
-		{
-			to_ret = get_flags(to_flags, to_ret);
-			if (to_ret)
+			from_ret |= res & (descriptor_action::CLOSING_SOCKET | descriptor_action::EXECUTION_ERROR);
+			to_ret |= res & (descriptor_action::CLOSING_SOCKET | descriptor_action::EXECUTION_ERROR);
+			if (to)
 			{
 				obj.push_back({*to, to_ret});
-				log(to_name << ' ' << **to << ' ' << ((to_ret & START_READING) ? "START_READING " : "") << ((to_ret & STOP_READING) ? "STOP_READING " : "") << ((to_ret & START_WRITING) ? "START_WRITING " : "") << ((to_ret & STOP_WRITING) ? "STOP_WRITING " : ""));
 			}
-		}
-		if (from)
-		{
-			from_ret = get_flags(from_flags, from_ret);
-			if (from_ret)
+			if (from)
 			{
 				obj.push_back({*from, from_ret});
-				log(from_name << ' ' << **from << ' ' << ((from_ret & START_READING) ? "START_READING " : "") << ((from_ret & STOP_READING) ? "STOP_READING " : "") << ((from_ret & START_WRITING) ? "START_WRITING " : "") << ((from_ret & STOP_WRITING) ? "STOP_WRITING " : ""));
+			}
+		}
+		else
+		{
+			log("Delivery size " << to_io.delivery.size());
+			to_ret |= (to_io.delivery.size() < to_io.BUFFER_SIZE) ? descriptor_action::START_READING : descriptor_action::STOP_READING;
+			from_ret |= (to_io.delivery.size() > 0) ? descriptor_action::START_WRITING : descriptor_action::STOP_WRITING;
+
+			if (to)
+			{
+				to_ret = get_flags(to_flags, to_ret);
+				if (to_ret)
+				{
+					obj.push_back({*to, to_ret});
+					log(to_name << ' ' << **to << ' ' << ((to_ret & START_READING) ? "START_READING " : "") << ((to_ret & STOP_READING) ? "STOP_READING " : "") << ((to_ret & START_WRITING) ? "START_WRITING " : "") << ((to_ret & STOP_WRITING) ? "STOP_WRITING " : ""));
+				}
+			}
+			if (from)
+			{
+				from_ret = get_flags(from_flags, from_ret);
+				if (from_ret)
+				{
+					obj.push_back({*from, from_ret});
+					log(from_name << ' ' << **from << ' ' << ((from_ret & START_READING) ? "START_READING " : "") << ((from_ret & STOP_READING) ? "STOP_READING " : "") << ((from_ret & START_WRITING) ? "START_WRITING " : "") << ((from_ret & STOP_WRITING) ? "STOP_WRITING " : ""));
+				}
 			}
 		}
 	}
@@ -190,10 +213,8 @@ void cassette::invalidate_client()
 	client.reset();
 }
 
-cassette::result_type cassette::close()
+void cassette::upwrite_client()
 {
-	result_type obj;
-	log("Buffers sizes: out " << out.delivery.size() << " in " << in.delivery.size() << ", alive: client " << static_cast <bool> (client) << " server " << static_cast <bool> (server));
 	if (client)
 	{
 		if (out.delivery.size() > 0)
@@ -201,15 +222,11 @@ cassette::result_type cassette::close()
 			log("UPWRITING CLIENT");
 			out.write(*client);
 		}
-		else
-		{
-			log("NOUPWRITING CLIENT");
-		}
-
-		
-		obj.push_back({*client, descriptor_action::CLOSING_SOCKET});
 	}
-	
+}
+
+void cassette::upwrite_server()
+{
 	if (server)
 	{
 		if (in.delivery.size() > 0)
@@ -217,13 +234,29 @@ cassette::result_type cassette::close()
 			log("UPWRITING SERVER");
 			in.write(*server);
 		}
-		else
-		{
-			log("NOUPWRITING SERVER");
-		}
-		
+	}
+}
+
+cassette::result_type cassette::close_client()
+{
+	result_type obj;
+	log("Buffers sizes: out " << out.delivery.size() << " in " << in.delivery.size() << ", alive: client " << static_cast <bool> (client) << " server " << static_cast <bool> (server));
+	upwrite_server();
+	upwrite_client();
+	if (server)
+	{
 		obj.push_back({*server, descriptor_action::CLOSING_SOCKET});
 	}
+	client.reset();
+	return obj;
+}
+
+cassette::result_type cassette::close_server()
+{
+	result_type obj;
+	log("Buffers sizes: out " << out.delivery.size() << " in " << in.delivery.size() << ", alive: client " << static_cast <bool> (client) << " server " << static_cast <bool> (server));
+	upwrite_client();
+	server.reset();
 	return obj;
 }
 
@@ -298,4 +331,14 @@ bool cassette::need_new()
 bool cassette::server_still_alive()
 {
 	return static_cast <bool> (server);
+}
+
+boost::optional <simple_file_descriptor::pointer> cassette::get_server()
+{
+	return server;
+}
+
+boost::optional <simple_file_descriptor::pointer> cassette::get_client()
+{
+	return client;
 }

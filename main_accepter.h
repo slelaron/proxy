@@ -68,11 +68,12 @@ struct main_accepter
 			
 			if (my_cassette->need_new())
 			{
-				my_cassette->get_client_executor().new_steps();
 				log("Need new ");
 				//result.splice(result.begin(), my_cassette->stop_server());
 				//result.splice(result.begin(), my_cassette->read(fd));
 				auto the_host = my_cassette->get_client_executor().get_host();
+				my_cassette->get_client_executor().new_steps();
+				my_cassette->get_client_executor().reset();
 				if (the_host)
 				{
 					log("Host is " << *the_host);
@@ -80,6 +81,12 @@ struct main_accepter
 					{
 						log(*the_host);
 						host = *the_host;
+
+						auto prev_server = my_cassette->get_server();
+						if (prev_server)
+						{
+							result.push_back({*prev_server, descriptor_action::CLOSING_SOCKET});
+						}
 						
 						try
 						{
@@ -109,8 +116,6 @@ struct main_accepter
 				{						
 					result.push_back({fd, descriptor_action::CLOSING_SOCKET});
 				}
-
-				log("Need found");
 			}
 			return std::make_pair(result, std::move(accepted));
 		}
@@ -133,7 +138,6 @@ struct main_accepter
 		result_type operator()(simple_file_descriptor::pointer, epoll_event)
 		{
 			result_type result;
-			
 			result.splice(result.begin(), my_cassette->write_client());
 			
 			return result;
@@ -158,7 +162,7 @@ struct main_accepter
 
 		result_type operator()(simple_file_descriptor::pointer)
 		{
-			auto to_return = my_cassette->close();
+			auto to_return = my_cassette->close_client();
 			if (*last)
 			{
 				if (map->find(**last) != map->end())

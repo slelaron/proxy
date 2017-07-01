@@ -21,6 +21,7 @@ int http_executor::read(simple_file_descriptor::pointer smpl)
 {
 	int result = io_executor::read(smpl);
 
+	bool no = end_of_header;
 	if (!end_of_header)
 	{
 		size_t end = delivery.find(eoh_id, start);
@@ -75,6 +76,10 @@ int http_executor::read(simple_file_descriptor::pointer smpl)
 			filled += delivery.size() - start;
 		}
 	}
+	if (!no && end_of_header)
+	{
+		log(header);
+	}
 	return result;
 }
 
@@ -113,9 +118,9 @@ bool http_executor::status()
 		if (filled <= *length)
 		{
 			std::cerr << filled << ' ' << *length << std::endl;
-			std::abort();
+			//std::abort();
 		}
-		return filled == *length;
+		return filled >= *length;
 	}
 	return end_of_header;
 }

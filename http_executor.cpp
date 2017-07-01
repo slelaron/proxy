@@ -76,6 +76,8 @@ int http_executor::read(simple_file_descriptor::pointer smpl)
 				delivery.erase(pos, s.size());
 			}
 
+			filled -= header.size();
+
 			//end of erasing
 			
 			if (length_pos != std::string::npos)
@@ -86,12 +88,9 @@ int http_executor::read(simple_file_descriptor::pointer smpl)
 			}
 		}
 	}
-	else
+	if (length)
 	{
-		if (length)
-		{
-			filled += delivery.size() - start;
-		}
+		filled += delivery.size() - start;
 	}
 	if (!no && end_of_header)
 	{

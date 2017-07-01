@@ -97,6 +97,10 @@ int http_executor::read(simple_file_descriptor::pointer smpl)
 	{
 		log(header);
 	}
+	if (length)
+	{
+		log("Content-length: " << *length);
+	}
 	return result;
 }
 

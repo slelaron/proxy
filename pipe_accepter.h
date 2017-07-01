@@ -74,6 +74,14 @@ struct pipe_accepter
 					accepted.push_back(std::move(accepted_fd));
 				}
 			}
+			else
+			{
+				log("BAD BAD BAD BAD BAD BAD BAD BAD BAD BAD BAD BAD BAD BAD BAD BAD BAD BAD");
+				for (auto key_and_value: map->at(fd))
+				{
+					result.push_back({key_and_value.first, descriptor_action::EXECUTION_ERROR});
+				}
+			}
 			
 			map->erase(map->find(fd));
 

@@ -30,6 +30,7 @@ struct http_executor: io_executor
 
 	bool end_of_header;
 	int filled;
+	int header_size;
 	std::string header;
 	boost::optional <std::string> host;
 	boost::optional <int> port;

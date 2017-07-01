@@ -60,6 +60,13 @@ int http_executor::read(simple_file_descriptor::pointer smpl)
 			{
 				host = prehost;
 			}
+			
+			if (length_pos != std::string::npos)
+			{
+				length = std::stoi(header.substr(length_pos + length_id.size(), length_end - length_pos - length_id.size()));
+				//assert(end + 4 <= delivery.size());
+				filled += delivery.size() - end - 4;
+			}
 
 			//erasing host from get
 
@@ -76,21 +83,15 @@ int http_executor::read(simple_file_descriptor::pointer smpl)
 				delivery.erase(pos, s.size());
 			}
 
-			filled -= header.size();
-
 			//end of erasing
-			
-			if (length_pos != std::string::npos)
-			{
-				length = std::stoi(header.substr(length_pos + length_id.size(), length_end - length_pos - length_id.size()));
-				assert(end + 4 <= delivery.size());
-				filled += delivery.size() - end - 4;
-			}
 		}
 	}
-	if (length)
+	else
 	{
-		filled += delivery.size() - start;
+		if (length)
+		{
+			filled += delivery.size() - start;
+		}
 	}
 	if (!no && end_of_header)
 	{

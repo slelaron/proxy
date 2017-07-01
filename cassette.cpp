@@ -248,6 +248,8 @@ cassette::result_type cassette::close_client()
 		obj.push_back({*server, descriptor_action::CLOSING_SOCKET});
 	}
 	client.reset();
+	static_cast <io_executor*> (&in)->reset();
+	static_cast <io_executor*> (&out)->reset();
 	return obj;
 }
 
@@ -257,6 +259,8 @@ cassette::result_type cassette::close_server()
 	log("Buffers sizes: out " << out.delivery.size() << " in " << in.delivery.size() << ", alive: client " << static_cast <bool> (client) << " server " << static_cast <bool> (server));
 	upwrite_client();
 	server.reset();
+	static_cast <io_executor*> (&in)->reset();
+	static_cast <io_executor*> (&out)->reset();
 	return obj;
 }
 

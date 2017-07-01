@@ -145,3 +145,9 @@ void io_executor::put_info(const std::string& str)
 {
 	delivery = str;
 }
+
+void io_executor::reset()
+{
+	delivery.clear();
+	start = 0;
+}

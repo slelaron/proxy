@@ -24,6 +24,8 @@ struct io_executor
 
 	friend cassette;
 
+	void reset();
+
 	protected:
 
 	std::string delivery;

@@ -53,7 +53,7 @@ struct socket_descriptor: virtual simple_file_descriptor,
 		int possible_error = bind(**this, (sockaddr*)&addr, sizeof(sockaddr_in));
 		if (possible_error)
 		{
-			std::abort();
+			throw fd_exception("We can't bind now. Sorry!");
 		}
 		listen(**this, BACKLOGMAX);
 	}
@@ -75,7 +75,6 @@ struct socket_descriptor: virtual simple_file_descriptor,
 			int result = accept(event.data.fd, (sockaddr*)&addr, &len);
 			if (result == -1)
 			{
-				//Correct this fucking sheet!
 				throw fd_exception(std::string("Error accepting file descriptor: ") + strerror(errno), event.data.fd);
 			}
 			log("Accepting new socket " << result);

@@ -46,5 +46,9 @@ int main()
 	{
 		log("Signal caused");
 	}
+	catch (fd_exception ex)
+	{
+		log(ex.what());
+	}
 	return 0;
 }

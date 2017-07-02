@@ -82,6 +82,113 @@ struct everything_executor
 	{}
 
 	template <typename... Args>
+	int add_file_descriptor(file_descriptor <Args...> fd)
+	{
+		int fl = 0;
+		int init_fl = 0;
+
+		log(*fd << " -> " << ((contains_convertible_in_args <readable_tag, Args...>::value == 1) ? "Readable " : "") << ((contains_convertible_in_args <writable_tag, Args...>::value == 1) ? "Writable " : "") << ((contains_convertible_in_args <acceptable_tag, Args...>::value == 1) ? "Acceptable " : "") << ((contains_convertible_in_args <closable_tag, Args...>::value == 1) ? "Closable " : ""));
+		
+		set_function <writable_flag, writable_tag, writable>(writer, fl, init_fl, fd);
+		set_function <readable_flag, readable_tag, readable>(reader, fl, init_fl, fd);
+		set_accept(fl, init_fl, fd);
+		set_signal(fl, init_fl, fd);
+		set_close(closer, fl, init_fl, fd);
+		update_timer(fl, init_fl, fd);
+
+		fl |= (contains_in_args <auto_closable, Args...>::value) ? auto_closable_flag : 0;
+		init_fl |= (contains_in_args <auto_closable, Args...>::value) ? auto_closable_flag : 0;
+
+		assert(flags.find(*fd) == flags.end());
+		assert(init_flags.find(*fd) == init_flags.end());
+		
+		flags.insert({*fd, fl});
+		init_flags.insert({*fd, init_fl});
+		
+		epoll_event event = set_epoll_flags(*fd, fl);
+
+		log(CYAN << "Adding descriptor " << event.data.fd << " -> " << (((bool)(event.events & EPOLLIN)) ? "EPOLLIN " : "") << (((bool)(event.events & EPOLLOUT)) ? "EPOLLOUT " : "") << (((bool)(event.events & EPOLLRDHUP)) ? "EPOLLRDHUP " : "") << (((bool)(event.events & EPOLLHUP)) ? "EPOLLHUP " : "") << (((bool)(event.events & EPOLLERR)) ? "EPOLLERR" : "") << RESET);
+		
+		epoll_ctl(*epoll_fd, EPOLL_CTL_ADD, *fd, &event);
+		
+		descriptors.insert(std::make_pair(*fd, std::make_unique <file_descriptor <Args...>> (std::move(fd))));
+		return 0;
+	}
+
+	void wait()
+	{
+		epoll_event event[max_events];
+		for (int step = 0; ; step++)
+		{
+			log("Step " << step);
+			auto time_to_wait = my_timer.get_time();
+			log(RED << "Waiting with time " << time_to_wait.first << RESET);
+			int cnt = epoll_wait(*epoll_fd, event, max_events, time_to_wait.first);
+
+			std::unordered_set <int> deleted;
+			
+			if (cnt == 0)
+			{	
+				after_action(deleted, acceptable_type({std::make_pair(*time_to_wait.second, descriptor_action::CLOSING_SOCKET)}));
+				log(YELLOW << "Timer killed execution" << RESET);
+			}
+			
+			for (int i = 0; i < cnt; i++)
+			{
+				epoll_event current = event[i];
+				
+				log(CYAN << "Descriptor " << current.data.fd << " -> " << (((bool)(current.events & EPOLLIN)) ? "EPOLLIN " : "") << (((bool)(current.events & EPOLLOUT)) ? "EPOLLOUT " : "") << (((bool)(current.events & EPOLLRDHUP)) ? "EPOLLRDHUP " : "") << (((bool)(current.events & EPOLLHUP)) ? "EPOLLHUP " : "") << (((bool)(current.events & EPOLLERR)) ? "EPOLLERR" : "") << RESET);
+
+				if (deleted.find(current.data.fd) != deleted.end())
+				{
+					continue;
+				}
+
+				int fl = flags.at(current.data.fd);
+
+				if (fl & timer_flag)
+				{
+					times.at(current.data.fd) = my_timer.update(times.at(current.data.fd));
+				}
+				
+				if (current.events & (EPOLLRDHUP | EPOLLERR))
+				{
+					after_action(deleted, acceptable_type({std::make_pair(simple_file_descriptor::pointer(current.data.fd), descriptor_action::CLOSING_SOCKET)}));
+				}
+				if (deleted.find(current.data.fd) == deleted.end() && (current.events & EPOLLIN))
+				{
+					acceptable_type result; 
+					if (fl & signalizable_flag)
+					{
+						(*signaler)();
+					}
+					else if (fl & readable_flag)
+					{
+						result = reader.at(current.data.fd)(simple_file_descriptor::pointer(current.data.fd), current);
+					}
+					else if (fl & acceptable_flag)
+					{
+						result = accepter.at(current.data.fd)(simple_file_descriptor::pointer(current.data.fd), current);
+					}
+					after_action(deleted, result);
+				}
+				if (deleted.find(current.data.fd) == deleted.end() && (current.events & EPOLLOUT) && (fl & writable_flag))
+				{
+					auto result = writer.at(current.data.fd)(simple_file_descriptor::pointer(current.data.fd), current);
+					after_action(deleted, result);
+				}
+				if (deleted.find(current.data.fd) == deleted.end() && (fl & auto_closable_flag))
+				{
+					log("Auto-close " << current.data.fd);
+					after_action(deleted, acceptable_type({std::make_pair(simple_file_descriptor::pointer(current.data.fd), descriptor_action::CLOSING_SOCKET)}));
+				}
+			}
+		}
+	}
+
+	private:
+
+	template <typename... Args>
 	typename std::enable_if <contains_convertible_in_args <signalizable_tag, Args...>::value < 1, void>::type
 	set_signal(int& fl, int& init_fl, const file_descriptor <Args...>& fd)
 	{}
@@ -167,40 +274,6 @@ struct everything_executor
 		fl |= closable_flag;
 		init_fl |= closable_flag;
 		storage.insert({*fd, fd.get_close()});
-	}
-
-	template <typename... Args>
-	int add_file_descriptor(file_descriptor <Args...> fd)
-	{
-		int fl = 0;
-		int init_fl = 0;
-
-		log(*fd << " -> " << ((contains_convertible_in_args <readable_tag, Args...>::value == 1) ? "Readable " : "") << ((contains_convertible_in_args <writable_tag, Args...>::value == 1) ? "Writable " : "") << ((contains_convertible_in_args <acceptable_tag, Args...>::value == 1) ? "Acceptable " : "") << ((contains_convertible_in_args <closable_tag, Args...>::value == 1) ? "Closable " : ""));
-		
-		set_function <writable_flag, writable_tag, writable>(writer, fl, init_fl, fd);
-		set_function <readable_flag, readable_tag, readable>(reader, fl, init_fl, fd);
-		set_accept(fl, init_fl, fd);
-		set_signal(fl, init_fl, fd);
-		set_close(closer, fl, init_fl, fd);
-		update_timer(fl, init_fl, fd);
-
-		fl |= (contains_in_args <auto_closable, Args...>::value) ? auto_closable_flag : 0;
-		init_fl |= (contains_in_args <auto_closable, Args...>::value) ? auto_closable_flag : 0;
-
-		assert(flags.find(*fd) == flags.end());
-		assert(init_flags.find(*fd) == init_flags.end());
-		
-		flags.insert({*fd, fl});
-		init_flags.insert({*fd, init_fl});
-		
-		epoll_event event = set_epoll_flags(*fd, fl);
-
-		log(CYAN << "Adding descriptor " << event.data.fd << " -> " << (((bool)(event.events & EPOLLIN)) ? "EPOLLIN " : "") << (((bool)(event.events & EPOLLOUT)) ? "EPOLLOUT " : "") << (((bool)(event.events & EPOLLRDHUP)) ? "EPOLLRDHUP " : "") << (((bool)(event.events & EPOLLHUP)) ? "EPOLLHUP " : "") << (((bool)(event.events & EPOLLERR)) ? "EPOLLERR" : "") << RESET);
-		
-		epoll_ctl(*epoll_fd, EPOLL_CTL_ADD, *fd, &event);
-		
-		descriptors.insert(std::make_pair(*fd, std::make_unique <file_descriptor <Args...>> (std::move(fd))));
-		return 0;
 	}
 
 	inline void total_erasing(simple_file_descriptor::pointer fd)
@@ -299,79 +372,6 @@ struct everything_executor
 			}
 		}
 	}
-
-	void wait()
-	{
-		epoll_event event[max_events];
-		for (int step = 0; ; step++)
-		{
-			log("Step " << step);
-			auto time_to_wait = my_timer.get_time();
-			log(RED << "Waiting with time " << time_to_wait.first << RESET);
-			int cnt = epoll_wait(*epoll_fd, event, max_events, time_to_wait.first);
-
-			std::unordered_set <int> deleted;
-			
-			if (cnt == 0)
-			{	
-				after_action(deleted, acceptable_type({std::make_pair(*time_to_wait.second, descriptor_action::CLOSING_SOCKET)}));
-				log(YELLOW << "Timer killed execution" << RESET);
-			}
-			
-			for (int i = 0; i < cnt; i++)
-			{
-				epoll_event current = event[i];
-				
-				log(CYAN << "Descriptor " << current.data.fd << " -> " << (((bool)(current.events & EPOLLIN)) ? "EPOLLIN " : "") << (((bool)(current.events & EPOLLOUT)) ? "EPOLLOUT " : "") << (((bool)(current.events & EPOLLRDHUP)) ? "EPOLLRDHUP " : "") << (((bool)(current.events & EPOLLHUP)) ? "EPOLLHUP " : "") << (((bool)(current.events & EPOLLERR)) ? "EPOLLERR" : "") << RESET);
-
-				if (deleted.find(current.data.fd) != deleted.end())
-				{
-					continue;
-				}
-
-				int fl = flags.at(current.data.fd);
-
-				if (fl & timer_flag)
-				{
-					times.at(current.data.fd) = my_timer.update(times.at(current.data.fd));
-				}
-				
-				if (current.events & (EPOLLRDHUP | EPOLLERR))
-				{
-					after_action(deleted, acceptable_type({std::make_pair(simple_file_descriptor::pointer(current.data.fd), descriptor_action::CLOSING_SOCKET)}));
-				}
-				if (deleted.find(current.data.fd) == deleted.end() && (current.events & EPOLLIN))
-				{
-					acceptable_type result; 
-					if (fl & signalizable_flag)
-					{
-						(*signaler)();
-					}
-					else if (fl & readable_flag)
-					{
-						result = reader.at(current.data.fd)(simple_file_descriptor::pointer(current.data.fd), current);
-					}
-					else if (fl & acceptable_flag)
-					{
-						result = accepter.at(current.data.fd)(simple_file_descriptor::pointer(current.data.fd), current);
-					}
-					after_action(deleted, result);
-				}
-				if (deleted.find(current.data.fd) == deleted.end() && (current.events & EPOLLOUT) && (fl & writable_flag))
-				{
-					auto result = writer.at(current.data.fd)(simple_file_descriptor::pointer(current.data.fd), current);
-					after_action(deleted, result);
-				}
-				if (deleted.find(current.data.fd) == deleted.end() && (fl & auto_closable_flag))
-				{
-					log("Auto-close " << current.data.fd);
-					after_action(deleted, acceptable_type({std::make_pair(simple_file_descriptor::pointer(current.data.fd), descriptor_action::CLOSING_SOCKET)}));
-				}
-			}
-		}
-	}
-
-	private:
 
 	epoll_event set_epoll_flags(int fd, int fl)
 	{

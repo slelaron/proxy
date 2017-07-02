@@ -76,7 +76,7 @@ struct pipe_accepter
 			}
 			else
 			{
-				log("BAD BAD BAD BAD BAD BAD BAD BAD BAD BAD BAD BAD BAD BAD BAD BAD BAD BAD");
+				log("Broken link!");
 				for (auto key_and_value: map->at(fd))
 				{
 					result.push_back({key_and_value.first, descriptor_action::EXECUTION_ERROR});

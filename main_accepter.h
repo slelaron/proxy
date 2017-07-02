@@ -69,8 +69,7 @@ struct main_accepter
 			if (my_cassette->need_new())
 			{
 				log("Need new ");
-				//result.splice(result.begin(), my_cassette->stop_server());
-				//result.splice(result.begin(), my_cassette->read(fd));
+
 				auto the_host = my_cassette->get_client_executor().get_host();
 				my_cassette->get_client_executor().reset();
 				if (the_host)

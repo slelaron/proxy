@@ -14,66 +14,6 @@
 #include "cassette.h"
 #include "fd_exception.h"
 
-template <typename T, unsigned item = 0>
-struct from_container_erasable
-{
-	template <typename... Args>
-	from_container_erasable(Args&&... args)
-	{
-		log("Incorrect constructor used");
-	}
-
-	from_container_erasable(from_container_erasable&& another)
-	{
-		log("Correct constructor used");
-		std::swap(to_erase_from, another.to_erase_from);
-	}
-	
-	void set_container(T* container, typename T::iterator iter)
-	{
-		to_erase_from = boost::make_optional <std::pair <T*, typename T::iterator>> (std::make_pair(container, iter));
-	}
-
-	~from_container_erasable()
-	{
-		if (to_erase_from)
-		{ 
-			log("Erasing from storage");
-			to_erase_from->first->erase(to_erase_from->second);
-		}
-	}
-	
-	boost::optional <std::pair <T*, typename T::iterator>> to_erase_from;
-};
-
-template <unsigned item = 0>
-struct on_close_executable
-{
-	template <typename... Args>
-	on_close_executable(Args&&... args):
-		func([]() { log("Default function: on close executable"); })
-	{}
-
-	on_close_executable(on_close_executable&& another)
-	{
-		std::swap(func, another.func);
-	}
-
-	void set_close_function(std::function <void()> func)
-	{
-		this->func = func;
-	}
-
-	~on_close_executable()
-	{
-		func();
-	}
-
-	private:
-
-	std::function <void()> func;
-};
-
 struct time_dependent
 {
 	const static unsigned STANDART_TIME = 5000;
@@ -114,16 +54,6 @@ struct time_dependent_compile: time_dependent
 	{}
 };
 
-struct test_class
-{
-	test_class(test_class&&)
-	{}
-
-	template <typename... Args>
-	test_class(Args... args)
-	{}
-};
-
 struct non_blocking: virtual simple_file_descriptor
 {
 	template <typename... Args>
@@ -156,13 +86,6 @@ struct executable_tag
 template <typename R, typename... Args>
 struct executable: virtual executable_tag
 {
-	/*template <typename... Args1>
-	executable(Args1&&... args):
-		func([](Args... args) -> R {throw fd_exception("Default constructor");})
-	{
-		log("Bad constructor");
-	}*/
-
 	executable(int):
 		func([](Args... args) -> R {throw fd_exception("Default constructor");})
 	{}
@@ -351,7 +274,7 @@ struct notifier: virtual simple_file_descriptor
 		buffer[1] = *fd >> 8;
 		buffer[2] = *fd >> 16;
 		buffer[3] = *fd >> 24;
-		write(*fd, buffer, 4);
+		assert(write(*fd, buffer, 4) != -1);
 	}
 };
 

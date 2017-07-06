@@ -4,6 +4,6 @@
 
 #ifndef log
 #define log(a) \
-	std::cerr << a << std::endl; \
-	std::cout << a << std::endl;
+	std::cerr << a << std::endl;
+	//std::cout << a << std::endl;
 #endif

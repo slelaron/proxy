@@ -134,37 +134,3 @@ struct template_list <another_list <Q, Args...>>
 		static_cast <type&> (descriptor).set_func(std::get<item>(arg));
 	}
 };
-
-template <typename T>
-struct apply_all
-{
-	typedef T type;
-};
-
-template <unsigned count, typename T, typename... Args>
-struct add_from_container_erasable
-{
-	typedef typename add_from_container_erasable <count - 1, T, from_container_erasable <T, count>, Args...>::type type;
-};
-
-template <typename T, typename... Args>
-struct add_from_container_erasable <0, T, Args...>
-{
-	typedef file_descriptor <Args...> type;
-};
-
-template <bool check, typename... Args>
-struct add_tag_to_file_descriptor
-{};
-
-template <typename T, typename... Args>
-struct add_tag_to_file_descriptor <true, T, file_descriptor <Args...>>
-{
-	typedef file_descriptor <T, Args...> type;
-};
-
-template <typename T, typename... Args>
-struct add_tag_to_file_descriptor <false, T, file_descriptor <Args...>>
-{
-	typedef file_descriptor <Args...> type;
-};

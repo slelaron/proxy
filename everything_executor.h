@@ -59,8 +59,6 @@ struct everything_executor
 		sigaddset(&mask, SIGTERM);
 		sigaddset(&mask, SIGINT);
 
-		//Need to make good LOG
-
 		if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1)
 		{
 			throw fd_exception("Sigprocmask error");

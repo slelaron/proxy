@@ -28,7 +28,7 @@ std::unique_ptr <name_resolver::applier> name_resolver::get_resolved(simple_file
 	{
 		throw fd_exception("Consumer doesn't exist");
 	}
-	log("Giving back " << consumers.at(fd).first);
+
 	names.erase(consumers.at(fd).first);
 	if (consumers.at(fd).second.get() == nullptr)
 	{
@@ -58,20 +58,12 @@ boost::optional <simple_file_descriptor::pointer> name_resolver::applier::operat
 		if (sfd == -1)
 			continue;
 
-		//You must use nonblocking file descriptor and after connecting you must check complition calling getsockopt!
-		//It is a big error here! Use EINPROGRESS!
-
 		int flags = fcntl(sfd, F_GETFL, 0);
 		fcntl(sfd, F_SETFL, flags | O_NONBLOCK);
 
 		sockaddr_in addr;
 		memset(&addr, 0, sizeof(sockaddr_in));
 		addr = *reinterpret_cast <sockaddr_in*> (res->ai_addr);
-		//in_addr that;
-		//that.s_addr = *res->ai_addr;
-		//addr.sin_family = *res->ai_family;
-		//addr.sin_port = htons(socket_descriptor::NECESSARY_PORT);
-		//addr.sin_addr = that;
 	
 		if (port)
 		{
@@ -103,7 +95,6 @@ name_resolver::applier::~applier()
 
 std::function <addrinfo*()> name_resolver::get_task(std::string host)
 {
-	//log("Here host " << host);
 	return [host]() -> addrinfo*
 	{
 		addrinfo hints;

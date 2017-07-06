@@ -12,37 +12,7 @@ cassette::result_type cassette::set_socket(simple_file_descriptor::pointer sock,
 	{
 		result.push_back({*fd, descriptor_action::CLOSING_SOCKET});
 	}
-	//log("Hello " << *sock);
 	fd = boost::make_optional <simple_file_descriptor::pointer>(sock);
-	//log("Buy " << **fd);
-	return result;
-}
-
-cassette::result_type cassette::stop_server()
-{
-	result_type result;
-	if (server)
-	{
-		int fl = get_flags(server_flags, descriptor_action::STOP_READING | descriptor_action::STOP_WRITING);
-		if (fl)
-		{
-			result.push_back({*server, fl});
-		}
-	}
-	return result;
-}
-
-cassette::result_type cassette::start_server()
-{
-	result_type result;
-	if (server)
-	{
-		int fl = get_flags(server_flags, descriptor_action::START_READING | descriptor_action::START_WRITING);
-		if (fl)
-		{
-			result.push_back({*server, fl});
-		}
-	}
 	return result;
 }
 
@@ -108,8 +78,6 @@ cassette::result_type cassette::read(boost::optional <simple_file_descriptor::po
 			}
 		}
 	}
-	//Think about following part of code!
-	//Don't you find it strange?
 	else
 	{
 		int res = get_flags(from_flags, descriptor_action::STOP_READING);
@@ -117,7 +85,6 @@ cassette::result_type cassette::read(boost::optional <simple_file_descriptor::po
 		log(from_name << ' ' << **from << ' ' << ((from_ret & START_READING) ? "START_READING " : "") << ((from_ret & STOP_READING) ? "STOP_READING " : "") << ((from_ret & START_WRITING) ? "START_WRITING " : "") << ((from_ret & STOP_WRITING) ? "STOP_WRITING " : "") << ((from_ret & CLOSING_SOCKET) ? "CLOSING_SOCKET " : ""));
 	}
 
-	//log("In cassette result size = " << obj.size());
 	return obj;
 }
 
@@ -181,8 +148,6 @@ cassette::result_type cassette::write(boost::optional <simple_file_descriptor::p
 			}
 		}
 	}
-	//Think about following part of code!
-	//Don't you find it strange?
 	else
 	{
 		int res = get_flags(from_flags, descriptor_action::STOP_WRITING);
@@ -201,16 +166,6 @@ cassette::result_type cassette::write_client()
 cassette::result_type cassette::write_server()
 {
 	return write(server, client, server_flags, client_flags, "Server", "Client", out, in);
-}
-
-void cassette::invalidate_server()
-{
-	server.reset();
-}
-
-void cassette::invalidate_client()
-{
-	client.reset();
 }
 
 void cassette::upwrite_client()
@@ -299,32 +254,6 @@ int cassette::get_flags(int& flags, int need)
 	}
 	result |= (need & descriptor_action::CLOSING_SOCKET);
 	return result;
-}
-
-bool cassette::can_read(simple_file_descriptor::pointer fd)
-{
-	if (client && *fd == **client)
-	{
-		return client_flags & readable_flag;
-	}
-	if (server && *fd == **server)
-	{
-		return server_flags & readable_flag;
-	}
-	return false;
-}
-
-bool cassette::can_write(simple_file_descriptor::pointer fd)
-{
-	if (client && *fd == **client)
-	{
-		return client_flags & writable_flag;
-	}
-	if (server && *fd == **server)
-	{
-		return server_flags & writable_flag;
-	}
-	return false;
 }
 
 bool cassette::need_new()

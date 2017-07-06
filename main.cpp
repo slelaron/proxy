@@ -13,7 +13,6 @@
 #include "file_descriptors.h"
 #include "descriptor_action.h"
 #include "name_resolver.h"
-#include "http_parser.h"
 #include "cassette.h"
 #include "main_accepter.h"
 #include "everything_executor.h"

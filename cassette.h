@@ -30,12 +30,6 @@ struct cassette
 	bool can_read(simple_file_descriptor::pointer fd);
 	bool can_write(simple_file_descriptor::pointer fd);
 
-	result_type stop_server();
-	result_type start_server();
-
-	void invalidate_client();
-	void invalidate_server();
-
 	boost::optional <simple_file_descriptor::pointer> get_server();
 	boost::optional <simple_file_descriptor::pointer> get_client();
 
